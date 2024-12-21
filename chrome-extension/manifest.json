@@ -5,7 +5,8 @@
   "description": "A Chrome extension that reads selected text",
   "permissions": [
     "activeTab",
-    "contextMenus"
+    "contextMenus",
+    "scripting"
   ],
   "background": {
     "service_worker": "background.bundle.js"

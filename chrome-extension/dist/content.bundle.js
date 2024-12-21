@@ -56,7 +56,30 @@ class ContentController {
   initializeListeners() {
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type === 'speakText') {
+      if (message.action === 'ping') {
+        sendResponse({
+          status: 'alive'
+        });
+        return true;
+      } else if (message.action === 'readText') {
+        this.speakText(message.text);
+        sendResponse({
+          status: 'reading'
+        });
+        return true;
+      } else if (message.type === 'stopSpeech') {
+        this.stopSpeech();
+        sendResponse({
+          status: 'stopped'
+        });
+        return true;
+      } else if (message.type === 'processingError') {
+        this.handleError(message.error);
+        sendResponse({
+          status: 'error'
+        });
+        return true;
+      } else if (message.type === 'speakText') {
         this.speakText(message.text, message.options);
       } else if (message.type === 'stopSpeech') {
         this.stopSpeech();
