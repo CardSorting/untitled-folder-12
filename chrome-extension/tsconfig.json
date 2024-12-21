@@ -11,6 +11,7 @@
     "rootDir": "./src",
     "sourceMap": true,
     "typeRoots": ["./node_modules/@types"],
+    "types": ["chrome"],
     "lib": ["DOM", "ES2020"],
     "allowJs": true,
     "checkJs": true

@@ -1,148 +1,130 @@
 // Background script for handling text-to-speech processing
-import { createLogger, Logger } from './utils/logger';
-import { celeryClient } from './utils/celeryClient';
+import { createLogger } from './utils/logger';
+import { initManager } from './utils/initUtils';
+import { messagingManager } from './utils/messaging';
+import { contextMenuManager } from './utils/contextMenu';
+import { textProcessingManager } from './utils/textProcessor';
+import { StorageService } from './services/storage';
+import { 
+    ContentScriptReadyMessage,
+    ProcessTextMessage,
+    GetDebugInfoMessage,
+    ExtensionMessage,
+    ExtensionResponse,
+    ContentScriptReadyResponse,
+    ProcessTextResponse,
+    GetDebugInfoResponse
+} from './types/messages';
 
-interface TaskInfo {
-    taskId: string;
-    status: string;
-    result?: any;
-    error?: string;
-}
+const logger = createLogger('Background');
+const storageService = StorageService.getInstance();
 
-interface ProcessTextRequest {
-    type: 'processText';
-    text: string;
-    options: {
-        rate?: number;
-        pitch?: number;
-        volume?: number;
-        language?: string;
-    };
-}
+// Initialize extension
+async function initializeExtension() {
+    try {
+        // Check permissions
+        const permissions = await initManager.checkPermissions();
+        const hostPermissions = await initManager.validateHostPermissions();
 
-class BackgroundController {
-    private static instance: BackgroundController;
-    private logger: Logger;
-    private activeTasks: Map<number, string>; // Map of tabId -> taskId
-    private taskCheckInterval: number;
+        logger.info('Permissions status:', { permissions, hostPermissions });
 
-    private constructor() {
-        this.logger = createLogger('Background');
-        this.activeTasks = new Map();
-        this.taskCheckInterval = 1000; // Check task status every second
-
-        // Initialize listeners
-        this.initializeListeners();
-        this.createContextMenu();
-    }
-
-    public static getInstance(): BackgroundController {
-        if (!BackgroundController.instance) {
-            BackgroundController.instance = new BackgroundController();
-        }
-        return BackgroundController.instance;
-    }
-
-    private createContextMenu(): void {
-        chrome.contextMenus.create({
+        // Create context menu
+        await contextMenuManager.createMenu({
             id: 'readText',
             title: 'Read Selected Text',
             contexts: ['selection']
-        }, () => {
-            const error = chrome.runtime.lastError;
-            if (error) {
-                this.logger.error('Error creating context menu:', { error: error.message });
-            }
-        });
-    }
-
-    private initializeListeners(): void {
-        // Listen for messages from content scripts
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            if (sender.tab?.id) {
-                if (request.type === 'contentScriptReady') {
-                    this.logger.info('Content script ready in tab:', { tabId: sender.tab.id });
-                    return;
-                }
-                
-                if (request.type === 'processText') {
-                    this.handleProcessText(request, sender.tab.id)
-                        .then(response => sendResponse(response))
-                        .catch(error => sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' }));
-                    return true; // Will respond asynchronously
-                }
-            }
-            return false;
         });
 
-        // Handle tab updates
-        chrome.tabs.onUpdated.addListener((tabId: number, changeInfo) => {
-            if (changeInfo.status === 'complete') {
-                this.cleanupTasks(tabId);
-            }
+        // Register message handlers
+        setupMessageHandlers();
+
+        // Load initial settings
+        await storageService.getSettings();
+
+        // Mark background script as initialized
+        initManager.markInitialized('background', {
+            contextMenu: true,
+            permissions,
+            hostPermissions
         });
 
-        // Handle tab removal
-        chrome.tabs.onRemoved.addListener((tabId: number) => {
-            this.cleanupTasks(tabId);
+        logger.info('Extension initialized successfully');
+    } catch (error) {
+        initManager.markError('background', error instanceof Error ? error : 'Unknown error');
+        logger.error('Failed to initialize extension:', {
+            error: error instanceof Error ? error.message : 'Unknown error'
         });
-    }
-
-    private async handleProcessText(request: ProcessTextRequest, tabId: number): Promise<TaskInfo> {
-        try {
-            const result = await celeryClient.processText(request.text, request.options);
-            this.activeTasks.set(tabId, result.taskId);
-            return result;
-        } catch (error) {
-            this.logger.error('Error processing text:', { error: error instanceof Error ? error.message : 'Unknown error' });
-            throw error;
-        }
-    }
-
-    private async pollTaskStatus(taskId: string): Promise<TaskInfo> {
-        try {
-            const status = await celeryClient.checkTaskStatus(taskId);
-            return status;
-        } catch (error) {
-            this.logger.error('Error polling task status:', { error: error instanceof Error ? error.message : 'Unknown error' });
-            throw error;
-        }
-    }
-
-    private cleanupTasks(tabId: number): void {
-        const taskId = this.activeTasks.get(tabId);
-        if (taskId) {
-            celeryClient.cancelTask(taskId).catch(error => {
-                this.logger.error('Error canceling task:', { error: error instanceof Error ? error.message : 'Unknown error' });
-            });
-            this.activeTasks.delete(tabId);
-        }
-    }
-
-    private async notifyContentScript(tabId: number, message: any): Promise<void> {
-        try {
-            await chrome.tabs.sendMessage(tabId, message);
-        } catch (error: unknown) {
-            // If the content script is not ready, retry after a short delay
-            if (error instanceof Error && error.message.includes('Receiving end does not exist')) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                return this.notifyContentScript(tabId, message);
-            }
-            this.logger.error('Error notifying content script:', { error: error instanceof Error ? error.message : 'Unknown error' });
-            throw error;
-        }
     }
 }
 
-// Export singleton instance
-export const backgroundController = BackgroundController.getInstance();
+function setupMessageHandlers() {
+    // Handle content script ready message
+    messagingManager.registerHandler<'contentScriptReady'>(
+        'contentScriptReady', 
+        async (message): Promise<ContentScriptReadyResponse> => {
+            logger.info('Content script ready');
+            return { 
+                status: 'acknowledged',
+                debug: initManager.debugInfo()
+            };
+        }
+    );
 
-// Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.menuItemId === 'readText' && tab?.id) {
-        chrome.tabs.sendMessage(tab.id, {
-            type: 'readSelectedText',
-            text: info.selectionText
-        });
-    }
-});
+    // Handle text processing request
+    messagingManager.registerHandler<'processText'>(
+        'processText',
+        async (message): Promise<ProcessTextResponse> => {
+            if (!initManager.isInitialized('background')) {
+                return { 
+                    status: 'error',
+                    error: 'Background script not fully initialized',
+                    debug: initManager.debugInfo()
+                };
+            }
+
+            try {
+                // Get current TTS settings
+                const ttsSettings = await storageService.getTTSSettings();
+
+                // Merge settings with request options
+                const options = {
+                    ...ttsSettings,
+                    ...message.options
+                };
+
+                const result = await textProcessingManager.processText(message.text, options);
+                return {
+                    ...result,
+                    status: 'processing'
+                };
+            } catch (error) {
+                logger.error('Error processing text:', {
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+                return {
+                    status: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    debug: initManager.debugInfo()
+                };
+            }
+        }
+    );
+
+    // Handle debug info request
+    messagingManager.registerHandler<'getDebugInfo'>(
+        'getDebugInfo',
+        async (): Promise<GetDebugInfoResponse> => {
+            return {
+                ...initManager.debugInfo(),
+                extensionId: chrome.runtime.id,
+                manifestVersion: chrome.runtime.getManifest().manifest_version,
+                permissions: chrome.runtime.getManifest().permissions || [],
+                hostPermissions: chrome.runtime.getManifest().host_permissions || [],
+                timestamp: Date.now()
+            };
+        }
+    );
+}
+
+// Initialize the extension
+initializeExtension();

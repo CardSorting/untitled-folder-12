@@ -37,6 +37,7 @@ export class CeleryClient {
         timeout: number;
         [key: string]: any;
     };
+    private isInitialized: boolean = false;
 
     constructor(baseUrl: string = config.API_ENDPOINT) {
         this.logger = createLogger('CeleryClient');
@@ -51,9 +52,36 @@ export class CeleryClient {
             statusEndpoint: this.statusEndpoint,
             timeout: this.config.timeout
         });
+
+        // Check server connection
+        this.checkConnection();
+    }
+
+    private async checkConnection(): Promise<void> {
+        try {
+            const response = await fetch(this.baseUrl, {
+                method: 'HEAD',
+                signal: AbortSignal.timeout(5000)
+            });
+            this.isInitialized = response.ok;
+            this.logger.info('Server connection established');
+        } catch (error) {
+            this.isInitialized = false;
+            this.logger.warn('Failed to connect to server:', { 
+                error: error instanceof Error ? error.message : 'Unknown error',
+                baseUrl: this.baseUrl
+            });
+        }
     }
 
     public async processText(text: string, options: ProcessOptions = {}): Promise<TaskStatus> {
+        if (!this.isInitialized) {
+            await this.checkConnection();
+            if (!this.isInitialized) {
+                throw new Error('Cannot process text: Server not available');
+            }
+        }
+
         this.logger.debug('Processing text with Celery', { 
             textLength: text.length
         });
@@ -94,6 +122,13 @@ export class CeleryClient {
     }
 
     public async checkTaskStatus(taskId: string): Promise<TaskStatus> {
+        if (!this.isInitialized) {
+            await this.checkConnection();
+            if (!this.isInitialized) {
+                throw new Error('Cannot check task status: Server not available');
+            }
+        }
+
         try {
             const response = await fetch(`${this.statusEndpoint}/${taskId}`);
             if (!response.ok) {
@@ -114,6 +149,13 @@ export class CeleryClient {
     }
 
     public async pollTaskStatus(taskId: string, interval: number = 1000): Promise<any> {
+        if (!this.isInitialized) {
+            await this.checkConnection();
+            if (!this.isInitialized) {
+                throw new Error('Cannot poll task status: Server not available');
+            }
+        }
+
         return new Promise((resolve, reject) => {
             const poll = async () => {
                 try {
@@ -134,6 +176,13 @@ export class CeleryClient {
     }
 
     public async checkHealth(): Promise<HealthCheckResponse> {
+        if (!this.isInitialized) {
+            await this.checkConnection();
+            if (!this.isInitialized) {
+                throw new Error('Cannot check health: Server not available');
+            }
+        }
+
         try {
             const response = await fetch(`${this.baseUrl}/health`, {
                 signal: AbortSignal.timeout(5000) // Short timeout for health checks
@@ -146,6 +195,13 @@ export class CeleryClient {
     }
 
     public async cancelTask(taskId: string): Promise<void> {
+        if (!this.isInitialized) {
+            await this.checkConnection();
+            if (!this.isInitialized) {
+                throw new Error('Cannot cancel task: Server not available');
+            }
+        }
+
         try {
             const response = await fetch(`${this.statusEndpoint}/${taskId}/cancel`, {
                 method: 'POST'
