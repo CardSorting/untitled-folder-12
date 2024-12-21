@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-    mode: 'development',
+    mode: 'production',
     entry: {
         background: './src/background.js',
         content: './src/content.js',
@@ -9,10 +9,11 @@ module.exports = {
     },
     output: {
         filename: '[name].bundle.js',
-        path: path.resolve(__dirname, 'dist')
+        path: path.resolve(__dirname, 'dist'),
+        clean: true
     },
-    experiments: {
-        topLevelAwait: true
+    optimization: {
+        minimize: false // Avoid eval usage in production mode
     },
     module: {
         rules: [
@@ -25,8 +26,9 @@ module.exports = {
                         presets: [
                             ['@babel/preset-env', {
                                 targets: {
-                                    chrome: '88' // Minimum Chrome version that supports Manifest V3
-                                }
+                                    chrome: '88'
+                                },
+                                modules: false // Preserve ES modules
                             }]
                         ]
                     }

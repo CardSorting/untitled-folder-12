@@ -10,6 +10,25 @@ class BackgroundController {
 
         // Initialize listeners
         this.initializeListeners();
+        this.createContextMenu();
+    }
+
+    createContextMenu() {
+        chrome.contextMenus.create({
+            id: 'readSelectedText',
+            title: 'Read Selected Text',
+            contexts: ['selection']
+        });
+
+        chrome.contextMenus.onClicked.addListener((info, tab) => {
+            if (info.menuItemId === 'readSelectedText' && info.selectionText) {
+                this.handleProcessText({
+                    type: 'processText',
+                    text: info.selectionText,
+                    options: { language: 'en' }
+                }, tab.id);
+            }
+        });
     }
 
     initializeListeners() {
@@ -20,15 +39,6 @@ class BackgroundController {
                 return true; // Will respond asynchronously
             } else if (request.type === 'stopSpeech') {
                 this.handleStopSpeech();
-                sendResponse({ success: true });
-            } else if (request.type === 'pauseSpeech') {
-                this.handlePauseSpeech();
-                sendResponse({ success: true });
-            } else if (request.type === 'resumeSpeech') {
-                this.handleResumeSpeech();
-                sendResponse({ success: true });
-            } else if (request.type === 'updateOptions') {
-                this.handleUpdateOptions(request.options);
                 sendResponse({ success: true });
             }
         });
@@ -62,12 +72,13 @@ class BackgroundController {
             this.isProcessing = true;
 
             // Process the text
-            await this.textProcessor.processText(request.text, request.options);
-
-            // Send success message to content script
+            const processedText = await this.textProcessor.processText(request.text, request.options);
+            
+            // Send the processed text back to content script for speech synthesis
             chrome.tabs.sendMessage(tabId, {
-                type: 'processingComplete',
-                success: true
+                type: 'speakText',
+                text: processedText,
+                options: request.options
             });
 
             // Process next in queue if any
@@ -82,8 +93,7 @@ class BackgroundController {
             
             // Send error message to content script
             chrome.tabs.sendMessage(tabId, {
-                type: 'processingComplete',
-                success: false,
+                type: 'processingError',
                 error: error.message
             });
 
@@ -92,21 +102,11 @@ class BackgroundController {
     }
 
     handleStopSpeech() {
-        this.textProcessor.stop();
+        if (this.currentTabId) {
+            chrome.tabs.sendMessage(this.currentTabId, { type: 'stopSpeech' });
+        }
         this.queue = [];
         this.isProcessing = false;
-    }
-
-    handlePauseSpeech() {
-        this.textProcessor.pause();
-    }
-
-    handleResumeSpeech() {
-        this.textProcessor.resume();
-    }
-
-    handleUpdateOptions(options) {
-        this.textProcessor.setOptions(options);
     }
 }
 

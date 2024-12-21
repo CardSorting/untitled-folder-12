@@ -4,10 +4,6 @@ import { CeleryClient } from './utils/celeryClient';
 class TextProcessorWorker {
     constructor() {
         this.celeryClient = new CeleryClient();
-        this.speechSynthesis = window.speechSynthesis;
-        this.currentUtterance = null;
-        this.isProcessing = false;
-        this.queue = [];
         this.currentOptions = {
             rate: 1.0,
             pitch: 1.0,
@@ -32,8 +28,8 @@ class TextProcessorWorker {
             // Wait for processing to complete
             const processedText = await this.celeryClient.pollTaskStatus(taskId);
             
-            // Convert processed text into speech
-            return this._convertToSpeech(processedText);
+            // Return the processed text
+            return this._processSSMLMarkers(processedText);
         } catch (error) {
             console.error('Error processing text:', error);
             throw error;
@@ -118,81 +114,19 @@ class TextProcessorWorker {
         return formalWords.length / (formalWords.length + informalWords.length);
     }
 
-    async _convertToSpeech(processedText) {
-        return new Promise((resolve, reject) => {
-            const utterance = new SpeechSynthesisUtterance(processedText);
-            
-            // Apply current options
-            utterance.rate = this.currentOptions.rate;
-            utterance.pitch = this.currentOptions.pitch;
-            utterance.volume = this.currentOptions.volume;
-            utterance.lang = this.currentOptions.language;
-
-            // Handle SSML-like markers
-            this._applySSMLMarkers(utterance, processedText);
-
-            // Set up event handlers
-            utterance.onend = () => {
-                this.currentUtterance = null;
-                resolve();
-            };
-
-            utterance.onerror = (event) => {
-                this.currentUtterance = null;
-                reject(new Error(`Speech synthesis error: ${event.error}`));
-            };
-
-            // Store current utterance and speak
-            this.currentUtterance = utterance;
-            this.speechSynthesis.speak(utterance);
-        });
-    }
-
-    _applySSMLMarkers(utterance, text) {
+    _processSSMLMarkers(text) {
         // Handle breathing markers
         text = text.replace(/<break time="(\d+\.?\d*)s"\/>/g, (_, duration) => {
             return ' '.repeat(Math.ceil(parseFloat(duration) * 5));
         });
 
         // Handle prosody markers
-        const rateMatch = text.match(/<prosody rate="(\d+)%">/);
-        if (rateMatch) {
-            utterance.rate *= parseInt(rateMatch[1]) / 100;
-        }
+        text = text.replace(/<prosody ([^>]+)>(.*?)<\/prosody>/g, (_, attrs, content) => {
+            return content;
+        });
 
-        const pitchMatch = text.match(/<prosody pitch="([+-]\d+)%">/);
-        if (pitchMatch) {
-            const pitchChange = parseInt(pitchMatch[1]);
-            utterance.pitch *= (1 + pitchChange / 100);
-        }
-
-        const volumeMatch = text.match(/<prosody volume="([+-]\d+)db">/);
-        if (volumeMatch) {
-            const volumeChange = parseInt(volumeMatch[1]);
-            utterance.volume *= Math.pow(10, volumeChange / 20);
-        }
-
-        // Remove all SSML-like tags
+        // Remove all remaining SSML-like tags
         return text.replace(/<\/?[^>]+(>|$)/g, '');
-    }
-
-    stop() {
-        if (this.currentUtterance) {
-            this.speechSynthesis.cancel();
-            this.currentUtterance = null;
-        }
-    }
-
-    pause() {
-        if (this.currentUtterance) {
-            this.speechSynthesis.pause();
-        }
-    }
-
-    resume() {
-        if (this.currentUtterance) {
-            this.speechSynthesis.resume();
-        }
     }
 
     setOptions(options) {

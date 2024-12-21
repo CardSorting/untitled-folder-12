@@ -6,6 +6,8 @@ class ContentController {
         this.logger = createLogger('Content');
         this.isProcessing = false;
         this.selectedText = '';
+        this.currentUtterance = null;
+        this.speechSynthesis = window.speechSynthesis;
 
         // Initialize message listeners
         this.initializeListeners();
@@ -14,8 +16,12 @@ class ContentController {
     initializeListeners() {
         // Listen for messages from background script
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            if (message.type === 'processingComplete') {
-                this.handleProcessingComplete(message);
+            if (message.type === 'speakText') {
+                this.speakText(message.text, message.options);
+            } else if (message.type === 'stopSpeech') {
+                this.stopSpeech();
+            } else if (message.type === 'processingError') {
+                this.handleError(message.error);
             }
         });
 
@@ -32,7 +38,7 @@ class ContentController {
             // Ctrl/Cmd + Shift + S to start/stop speech
             if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'S') {
                 event.preventDefault();
-                if (this.isProcessing) {
+                if (this.isProcessing || this.currentUtterance) {
                     this.stopSpeech();
                 } else if (this.selectedText) {
                     this.processSelectedText();
@@ -71,19 +77,47 @@ class ContentController {
         }
     }
 
+    speakText(text, options = {}) {
+        this.stopSpeech();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Apply options
+        utterance.lang = options.language || 'en';
+        utterance.rate = options.rate || 1.0;
+        utterance.pitch = options.pitch || 1.0;
+        utterance.volume = options.volume || 1.0;
+
+        // Set up event handlers
+        utterance.onend = () => {
+            this.logger.info('Speech completed');
+            this.currentUtterance = null;
+            this.isProcessing = false;
+        };
+
+        utterance.onerror = (event) => {
+            this.logger.error('Speech synthesis error', event);
+            this.currentUtterance = null;
+            this.isProcessing = false;
+        };
+
+        // Store current utterance and speak
+        this.currentUtterance = utterance;
+        this.speechSynthesis.speak(utterance);
+    }
+
     stopSpeech() {
-        this.logger.info('Stopping speech');
-        chrome.runtime.sendMessage({ type: 'stopSpeech' });
+        if (this.currentUtterance) {
+            this.speechSynthesis.cancel();
+            this.currentUtterance = null;
+        }
         this.isProcessing = false;
     }
 
-    handleProcessingComplete(message) {
-        if (message.success) {
-            this.logger.success('Text processing completed');
-        } else {
-            this.logger.error('Text processing failed', message.error);
-        }
+    handleError(error) {
+        this.logger.error('Processing error:', error);
         this.isProcessing = false;
+        // You could show an error notification here if needed
     }
 }
 
