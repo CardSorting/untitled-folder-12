@@ -9,39 +9,23 @@ import langdetect
 # Common patterns across all languages
 COMMON_PATTERNS = {
     'whitespace': r'\s+',
-    'linebreak': r'\r?\n',
-    'indent': r'^(?:    |\t)',
-    'structure': {
-        'heading': {'#', '##', '###', '====', '----'},
-        'section': {'§', '¶', '†', '‡'},
-        'formatting': {'*', '_', '**', '__', '~~', '`'}
-    },
-    'quotes': {'"', '"', '"', "'", "'", "'", '「', '」', '『', '』'},
-    'lists': {
-        '•', '-', '*', '1.', '2.', '3.', '①', '②', '③',
-        'a.', 'b.', 'c.', 'A.', 'B.', 'C.', '(a)', '(b)', '(c)',
-        '一', '二', '三', 'Ⅰ', 'Ⅱ', 'Ⅲ'
-    }
+    'punctuation': r'[.,!?;:]',
+    'numbers': r'\d+',
+    'quotes': r'[""].*?[""]'
 }
 
-def detect_language(text):
+def detect_language(text: str) -> str:
     """Detect the language of the given text."""
     try:
-        lang = langdetect.detect(text)
-        if lang in ['zh-cn', 'zh-tw']:
-            return 'chinese'
-        elif lang == 'ja':
-            return 'japanese'
-        else:
-            return 'english'  # default to English for unsupported languages
+        return langdetect.detect(text)
     except:
-        return 'english'  # default to English if detection fails
+        return 'en'  # Default to English if detection fails
 
-def get_language_patterns(language):
+def get_language_patterns(language: str) -> dict:
     """Get language-specific patterns."""
     patterns = {
-        'english': ENGLISH_PATTERNS,
-        'japanese': JAPANESE_PATTERNS,
-        'chinese': CHINESE_PATTERNS
+        'en': ENGLISH_PATTERNS,
+        'ja': JAPANESE_PATTERNS,
+        'zh': CHINESE_PATTERNS
     }
-    return patterns.get(language, ENGLISH_PATTERNS)  # default to English if language not found
+    return patterns.get(language, ENGLISH_PATTERNS)  # Default to English if language not found

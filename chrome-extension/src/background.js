@@ -1,116 +1,114 @@
-import { createLogger } from './utils/logger';
+// Background script for handling text-to-speech processing
+import TextProcessorWorker from './textProcessorWorker';
 
-const logger = createLogger('Background');
+class BackgroundController {
+    constructor() {
+        this.textProcessor = new TextProcessorWorker();
+        this.currentTabId = null;
+        this.isProcessing = false;
+        this.queue = [];
 
-// Create context menu item
-chrome.runtime.onInstalled.addListener(() => {
-  logger.info('Extension installed, creating context menu');
-  chrome.contextMenus.create({
-    id: 'readSelectedText',
-    title: 'Read Selected Text',
-    contexts: ['selection']
-  });
-});
-
-// Ensure content script is injected
-async function ensureContentScriptInjected(tabId) {
-  const scriptLogger = logger.createSubLogger('ContentScript');
-  try {
-    // Check if content script is already injected
-    await chrome.tabs.sendMessage(tabId, { action: 'ping' });
-    scriptLogger.success('Content script already injected');
-    return true;
-  } catch (error) {
-    scriptLogger.warn('Content script not found, attempting injection');
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['dist/content.bundle.js']
-      });
-      scriptLogger.success('Content script injected successfully');
-      return true;
-    } catch (error) {
-      scriptLogger.error('Failed to inject content script', error);
-      return false;
+        // Initialize listeners
+        this.initializeListeners();
     }
-  }
+
+    initializeListeners() {
+        // Listen for messages from content scripts
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            if (request.type === 'processText') {
+                this.handleProcessText(request, sender.tab.id);
+                return true; // Will respond asynchronously
+            } else if (request.type === 'stopSpeech') {
+                this.handleStopSpeech();
+                sendResponse({ success: true });
+            } else if (request.type === 'pauseSpeech') {
+                this.handlePauseSpeech();
+                sendResponse({ success: true });
+            } else if (request.type === 'resumeSpeech') {
+                this.handleResumeSpeech();
+                sendResponse({ success: true });
+            } else if (request.type === 'updateOptions') {
+                this.handleUpdateOptions(request.options);
+                sendResponse({ success: true });
+            }
+        });
+
+        // Handle tab updates
+        chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+            if (changeInfo.status === 'complete' && tabId === this.currentTabId) {
+                this.handleStopSpeech();
+            }
+        });
+
+        // Handle tab removal
+        chrome.tabs.onRemoved.addListener((tabId) => {
+            if (tabId === this.currentTabId) {
+                this.handleStopSpeech();
+            }
+        });
+    }
+
+    async handleProcessText(request, tabId) {
+        try {
+            // Update current tab
+            this.currentTabId = tabId;
+
+            // Add to queue if currently processing
+            if (this.isProcessing) {
+                this.queue.push({ text: request.text, options: request.options });
+                return;
+            }
+
+            this.isProcessing = true;
+
+            // Process the text
+            await this.textProcessor.processText(request.text, request.options);
+
+            // Send success message to content script
+            chrome.tabs.sendMessage(tabId, {
+                type: 'processingComplete',
+                success: true
+            });
+
+            // Process next in queue if any
+            this.isProcessing = false;
+            if (this.queue.length > 0) {
+                const next = this.queue.shift();
+                this.handleProcessText({ text: next.text, options: next.options }, tabId);
+            }
+
+        } catch (error) {
+            console.error('Error processing text:', error);
+            
+            // Send error message to content script
+            chrome.tabs.sendMessage(tabId, {
+                type: 'processingComplete',
+                success: false,
+                error: error.message
+            });
+
+            this.isProcessing = false;
+        }
+    }
+
+    handleStopSpeech() {
+        this.textProcessor.stop();
+        this.queue = [];
+        this.isProcessing = false;
+    }
+
+    handlePauseSpeech() {
+        this.textProcessor.pause();
+    }
+
+    handleResumeSpeech() {
+        this.textProcessor.resume();
+    }
+
+    handleUpdateOptions(options) {
+        this.textProcessor.setOptions(options);
+    }
 }
 
-// Handle context menu clicks
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const menuLogger = logger.createSubLogger('ContextMenu');
-  
-  if (info.menuItemId === 'readSelectedText' && info.selectionText) {
-    menuLogger.info('Processing selected text', {
-      textLength: info.selectionText.length,
-      tabId: tab.id,
-      tabUrl: tab.url
-    });
-
-    // Ensure content script is injected
-    const isInjected = await ensureContentScriptInjected(tab.id);
-    if (!isInjected) {
-      menuLogger.error('Failed to ensure content script');
-      showNotification('Error', 'Failed to initialize text reader');
-      return;
-    }
-
-    // Send message to content script
-    menuLogger.debug('Sending text to content script');
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'readText',
-      text: info.selectionText
-    }, (response) => {
-      // Check for runtime error first
-      if (chrome.runtime.lastError) {
-        const error = chrome.runtime.lastError;
-        menuLogger.error('Runtime error in message response', error);
-        showNotification('Error', 'Failed to initialize text reader: ' + error.message);
-        return;
-      }
-
-      menuLogger.debug('Received response from content script', response);
-
-      if (response?.success) {
-        menuLogger.success('Text processing started successfully');
-        showNotification('Success', 'Starting text-to-speech');
-      } else {
-        const errorMessage = response?.error || 'Failed to process text';
-        menuLogger.error('Text processing failed', { error: errorMessage });
-        showNotification('Error', errorMessage);
-      }
-    });
-  }
-});
-
-// Show notification with error handling
-function showNotification(title, message) {
-  const notifyLogger = logger.createSubLogger('Notification');
-  notifyLogger.debug('Showing notification', { title, message });
-  
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icons/icon128.png',
-    title,
-    message
-  }, (notificationId) => {
-    if (chrome.runtime.lastError) {
-      notifyLogger.error('Failed to show notification', chrome.runtime.lastError);
-    } else {
-      notifyLogger.success('Notification shown', { notificationId });
-    }
-  });
-}
-
-// Listen for messages from content script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const msgLogger = logger.createSubLogger('MessageListener');
-  msgLogger.debug('Received message from content script', {
-    request,
-    sender: {
-      tab: sender.tab?.id,
-      url: sender.tab?.url
-    }
-  });
-  return true;
-});
+// Initialize the background controller
+const backgroundController = new BackgroundController();
