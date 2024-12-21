@@ -2,7 +2,7 @@ const path = require('path');
 
 module.exports = {
   mode: 'development',
-  devtool: 'inline-source-map',
+  devtool: 'source-map',
   entry: {
     background: './src/background.ts',
     content: './src/content.ts',
@@ -10,8 +10,8 @@ module.exports = {
   },
   output: {
     filename: '[name].js',
-    path: path.resolve(__dirname, '.'),
-    clean: false // Disable cleaning to prevent file deletion
+    path: path.resolve(__dirname, 'dist'),
+    clean: true
   },
   module: {
     rules: [

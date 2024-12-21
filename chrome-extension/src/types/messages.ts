@@ -74,48 +74,53 @@ export type ExtensionResponse =
 // Base Response Interface
 export interface BaseResponse {
     error?: string;
+    code?: string;
     debug?: Record<string, any>;
 }
 
-// Content Script Ready Response
-export interface ContentScriptReadyResponse extends BaseResponse {
-    status: 'acknowledged';
+// Base Error Response
+export interface BaseErrorResponse extends BaseResponse {
+    status: 'error';
+    error: string;
+    code: string;
 }
+
+// Content Script Ready Response
+export type ContentScriptReadyResponse = 
+    | { status: 'acknowledged'; debug?: Record<string, any>; }
+    | BaseErrorResponse;
 
 // Process Text Response
-export interface ProcessTextResponse extends BaseResponse {
-    status: 'processing' | 'completed' | 'error';
-    taskId?: string;
-    result?: string;
-}
+export type ProcessTextResponse = 
+    | { status: 'processing' | 'completed'; taskId: string; result?: string; debug?: Record<string, any>; }
+    | BaseErrorResponse;
 
 // Context Menu Action Response
-export interface ContextMenuActionResponse extends BaseResponse {
-    status?: 'processing';
-    taskId?: string;
-}
+export type ContextMenuActionResponse = 
+    | { status: 'processing'; taskId: string; debug?: Record<string, any>; }
+    | BaseErrorResponse;
 
 // Update Settings Response
-export interface UpdateSettingsResponse extends BaseResponse {
-    status: 'updated';
-    settings: TextProcessingSettings;
-}
+export type UpdateSettingsResponse = 
+    | { status: 'updated'; settings: TextProcessingSettings; debug?: Record<string, any>; }
+    | BaseErrorResponse;
 
 // Task Status Response
-export interface TaskStatusResponse extends BaseResponse {
-    status: 'pending' | 'processing' | 'completed' | 'error';
-    progress?: number;
-    result?: string;
-}
+export type TaskStatusResponse = 
+    | { status: 'pending' | 'processing' | 'completed'; progress?: number; result?: string; debug?: Record<string, any>; }
+    | BaseErrorResponse;
 
 // Get Debug Info Response
-export interface GetDebugInfoResponse extends BaseResponse {
+export type GetDebugInfoResponse = {
     extensionId: string;
     manifestVersion: 2 | 3;
     permissions: string[];
     hostPermissions: string[];
     timestamp: number;
-}
+    error?: string;
+    code?: string;
+    debug?: Record<string, any>;
+};
 
 // Error Response
 export interface ErrorResponse extends BaseResponse {

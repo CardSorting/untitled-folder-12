@@ -1,216 +1,192 @@
 // Celery client for handling text processing tasks
-import { createLogger, Logger } from './logger';
+import { createLogger } from './logger';
 import { config } from '../config';
+import { CeleryTask, CeleryTaskResult, CeleryTaskStatus, HealthCheckResponse, TaskResponse } from '../types/celery';
+import { LogContext } from './logger';
 
-interface ProcessOptions {
+interface ProcessOptions extends LogContext {
     language?: string;
+    voice?: string;
     rate?: number;
     pitch?: number;
     volume?: number;
     emotionalContext?: Record<string, any>;
     textStructure?: Record<string, any>;
+    [key: string]: any;
 }
 
-interface TaskResponse {
-    task_id: string;
-    status?: string;
-}
-
-interface TaskStatus {
-    taskId: string;
-    status: string;
-    result?: any;
-    error?: string;
-}
-
-interface HealthCheckResponse {
-    status: string;
-    message?: string;
-}
+const logger = createLogger('CeleryClient');
 
 export class CeleryClient {
-    private logger: Logger;
-    private baseUrl: string;
-    private taskEndpoint: string;
-    private statusEndpoint: string;
-    private config: {
-        timeout: number;
-        [key: string]: any;
-    };
-    private isInitialized: boolean = false;
+    private readonly baseUrl: string;
+    private readonly taskQueue: Map<string, CeleryTask>;
+    private readonly pollInterval: number;
+    private readonly maxRetries: number;
 
-    constructor(baseUrl: string = config.API_ENDPOINT) {
-        this.logger = createLogger('CeleryClient');
+    constructor(baseUrl: string = config.API_ENDPOINT, pollInterval = 1000, maxRetries = 3) {
         this.baseUrl = baseUrl;
-        this.taskEndpoint = `${this.baseUrl}${config.endpoints.processText}`;
-        this.statusEndpoint = `${this.baseUrl}${config.endpoints.taskStatus}`;
-        this.config = config.celery;
-        
-        this.logger.info('CeleryClient initialized', {
-            baseUrl: this.baseUrl,
-            taskEndpoint: this.taskEndpoint,
-            statusEndpoint: this.statusEndpoint,
-            timeout: this.config.timeout
-        });
-
-        // Check server connection
-        this.checkConnection();
+        this.taskQueue = new Map();
+        this.pollInterval = pollInterval;
+        this.maxRetries = maxRetries;
     }
 
-    private async checkConnection(): Promise<void> {
+    async processText(text: string, options: ProcessOptions = {}): Promise<string> {
         try {
-            const response = await fetch(this.baseUrl, {
-                method: 'HEAD',
-                signal: AbortSignal.timeout(5000)
-            });
-            this.isInitialized = response.ok;
-            this.logger.info('Server connection established');
-        } catch (error) {
-            this.isInitialized = false;
-            this.logger.warn('Failed to connect to server:', { 
-                error: error instanceof Error ? error.message : 'Unknown error',
-                baseUrl: this.baseUrl
-            });
-        }
-    }
-
-    public async processText(text: string, options: ProcessOptions = {}): Promise<TaskStatus> {
-        if (!this.isInitialized) {
-            await this.checkConnection();
-            if (!this.isInitialized) {
-                throw new Error('Cannot process text: Server not available');
-            }
-        }
-
-        this.logger.debug('Processing text with Celery', { 
-            textLength: text.length
-        });
-
-        try {
-            const response = await fetch(this.taskEndpoint, {
+            const response = await fetch(`${this.baseUrl}${config.endpoints.processText}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     text,
-                    language: options.language || 'en',
-                    rate: options.rate || 1.0,
-                    pitch: options.pitch || 1.0,
-                    volume: options.volume || 1.0,
+                    language: options.language || 'en-US',
+                    voice: options.voice,
+                    rate: options.rate,
+                    pitch: options.pitch,
+                    volume: options.volume,
                     emotionalContext: options.emotionalContext || {},
                     textStructure: options.textStructure || {}
                 }),
-                signal: AbortSignal.timeout(this.config.timeout)
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.error || 'Unknown error'}`);
+                throw new Error(`Failed to process text: ${response.statusText}`);
             }
 
-            const data = await response.json() as TaskResponse;
-            this.logger.success('Text processed successfully', data);
-            return {
-                taskId: data.task_id,
-                status: 'PENDING'
-            };
+            const data: TaskResponse = await response.json();
+            const taskId = data.task_id;
+
+            if (!taskId) {
+                throw new Error('No task ID returned from server');
+            }
+
+            this.taskQueue.set(taskId, {
+                id: taskId,
+                name: 'processText',
+                args: [text, options],
+                status: 'PENDING',
+                result: null,
+                error: null,
+                retries: 0,
+            });
+
+            logger.info('Text processing task submitted', { taskId });
+            return taskId;
         } catch (error) {
-            this.logger.error('Error processing text:', { error: error instanceof Error ? error.message : 'Unknown error' });
+            logger.error('Error processing text', { error: String(error) });
             throw error;
         }
     }
 
-    public async checkTaskStatus(taskId: string): Promise<TaskStatus> {
-        if (!this.isInitialized) {
-            await this.checkConnection();
-            if (!this.isInitialized) {
-                throw new Error('Cannot check task status: Server not available');
-            }
-        }
-
+    async getTaskResult(taskId: string): Promise<CeleryTaskStatus> {
         try {
-            const response = await fetch(`${this.statusEndpoint}/${taskId}`);
+            const response = await fetch(`${this.baseUrl}${config.endpoints.taskStatus}/${taskId}`);
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`Failed to get task status: ${response.statusText}`);
             }
 
-            const data = await response.json();
+            const data: TaskResponse = await response.json();
             return {
                 taskId,
                 status: data.status,
                 result: data.result,
-                error: data.error
+                error: data.error || undefined,
+                message: data.message
             };
         } catch (error) {
-            this.logger.error('Error checking task status:', { error: error instanceof Error ? error.message : 'Unknown error' });
+            logger.error('Error getting task result', { taskId, error: String(error) });
             throw error;
         }
     }
 
-    public async pollTaskStatus(taskId: string, interval: number = 1000): Promise<any> {
-        if (!this.isInitialized) {
-            await this.checkConnection();
-            if (!this.isInitialized) {
-                throw new Error('Cannot poll task status: Server not available');
-            }
+    async pollTaskStatus(taskId: string): Promise<CeleryTaskStatus> {
+        const task = this.taskQueue.get(taskId);
+        if (!task) {
+            throw new Error(`Task ${taskId} not found in queue`);
         }
 
-        return new Promise((resolve, reject) => {
-            const poll = async () => {
-                try {
-                    const status = await this.checkTaskStatus(taskId);
-                    if (status.status === 'SUCCESS') {
-                        resolve(status.result);
-                    } else if (status.status === 'FAILURE') {
-                        reject(new Error(status.error || 'Task failed'));
-                    } else {
-                        setTimeout(poll, interval);
-                    }
-                } catch (error) {
-                    reject(error);
-                }
+        try {
+            const result = await this.getTaskResult(taskId);
+            task.status = result.status;
+            task.result = result.result;
+            task.error = result.error || null;
+
+            if (result.status === 'SUCCESS') {
+                logger.info('Task completed successfully', { 
+                    taskId, 
+                    result: result.result ? JSON.stringify(result.result) : null 
+                });
+                this.taskQueue.delete(taskId);
+            } else if (result.status === 'FAILURE') {
+                logger.error('Task failed', { 
+                    taskId, 
+                    error: result.error || 'Unknown error'
+                });
+                this.taskQueue.delete(taskId);
+            } else {
+                logger.info('Task status updated', { 
+                    taskId, 
+                    status: result.status 
+                });
+            }
+
+            return result;
+        } catch (error) {
+            task.retries++;
+            if (task.retries >= this.maxRetries) {
+                logger.error('Max retries reached', { 
+                    taskId, 
+                    error: error instanceof Error ? error.message : String(error),
+                    retries: task.retries
+                });
+                this.taskQueue.delete(taskId);
+                throw error;
+            }
+            logger.warn('Error polling task status, retrying', { 
+                taskId, 
+                retries: task.retries,
+                error: error instanceof Error ? error.message : String(error)
+            });
+            return { 
+                taskId, 
+                status: 'PENDING', 
+                result: null, 
+                error: undefined 
             };
-            poll();
-        });
+        }
     }
 
-    public async checkHealth(): Promise<HealthCheckResponse> {
-        if (!this.isInitialized) {
-            await this.checkConnection();
-            if (!this.isInitialized) {
-                throw new Error('Cannot check health: Server not available');
-            }
-        }
+    getQueuedTasks(): CeleryTask[] {
+        return Array.from(this.taskQueue.values());
+    }
 
+    async checkHealth(): Promise<HealthCheckResponse> {
         try {
             const response = await fetch(`${this.baseUrl}/health`, {
                 signal: AbortSignal.timeout(5000) // Short timeout for health checks
             });
             return await response.json() as HealthCheckResponse;
         } catch (error) {
-            this.logger.error('Health check failed:', { error: error instanceof Error ? error.message : 'Unknown error' });
+            logger.error('Health check failed', { 
+                error: error instanceof Error ? error.message : String(error) 
+            });
             throw error;
         }
     }
 
-    public async cancelTask(taskId: string): Promise<void> {
-        if (!this.isInitialized) {
-            await this.checkConnection();
-            if (!this.isInitialized) {
-                throw new Error('Cannot cancel task: Server not available');
-            }
-        }
-
+    async cancelTask(taskId: string): Promise<void> {
         try {
-            const response = await fetch(`${this.statusEndpoint}/${taskId}/cancel`, {
+            const response = await fetch(`${this.baseUrl}${config.endpoints.taskStatus}/${taskId}/cancel`, {
                 method: 'POST'
             });
             if (!response.ok) {
-                throw new Error(`Failed to cancel task: ${taskId}`);
+                throw new Error(`Failed to cancel task: ${response.statusText}`);
             }
         } catch (error) {
-            this.logger.error('Error canceling task:', { error: error instanceof Error ? error.message : 'Unknown error' });
+            logger.error('Error canceling task', { 
+                taskId,
+                error: error instanceof Error ? error.message : String(error) 
+            });
             throw error;
         }
     }

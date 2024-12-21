@@ -1,175 +1,176 @@
-// Content script for handling text selection and speech synthesis
+// Content script for handling text selection and TTS
 import { createLogger } from './utils/logger';
-import { initManager } from './utils/initUtils';
 import { messagingManager } from './utils/messaging';
-import { StorageService } from './services/storage';
-import { SpeechService } from './services/speech';
 import { 
-    ContextMenuActionMessage,
+    ContentScriptReadyMessage,
     ProcessTextMessage,
-    ExtensionMessage,
+    ContextMenuActionMessage,
     ContentScriptReadyResponse,
     ProcessTextResponse,
-    ContextMenuActionResponse
+    ContextMenuActionResponse,
+    BaseErrorResponse
 } from './types/messages';
 
 const logger = createLogger('Content');
-const storageService = StorageService.getInstance();
-const speechService = SpeechService.getInstance();
+
+// Type guard for process text success response
+function isProcessTextSuccessResponse(response: any): response is Extract<ProcessTextResponse, { status: 'processing' | 'completed' }> {
+    return response && 
+           typeof response === 'object' && 
+           ('status' in response) &&
+           (response.status === 'processing' || response.status === 'completed') &&
+           'taskId' in response &&
+           typeof response.taskId === 'string';
+}
+
+// Type guard for error response
+function isErrorResponse(response: any): response is BaseErrorResponse {
+    return response && 
+           typeof response === 'object' && 
+           'status' in response &&
+           response.status === 'error' &&
+           'error' in response &&
+           'code' in response;
+}
+
+// Safe debug info type
+type SafeDebugInfo = {
+    [key: string]: string | number | boolean | null | SafeDebugInfo;
+};
+
+// Convert unknown error to safe debug info
+function toSafeDebugInfo(error: unknown): SafeDebugInfo {
+    if (error instanceof Error) {
+        return {
+            name: error.name,
+            message: error.message,
+            stack: error.stack || 'No stack trace'
+        };
+    }
+    return {
+        error: String(error)
+    };
+}
+
+// Function to handle text selection
+async function handleTextSelection(text: string): Promise<ContextMenuActionResponse> {
+    try {
+        logger.info('Processing selected text');
+
+        const response = await messagingManager.sendMessage({
+            type: 'processText',
+            text
+        } as ProcessTextMessage);
+
+        if (isErrorResponse(response)) {
+            return {
+                status: 'error',
+                error: response.error,
+                code: response.code,
+                debug: response.debug || {}
+            };
+        }
+
+        if (!isProcessTextSuccessResponse(response)) {
+            return {
+                status: 'error',
+                error: 'Invalid response from server',
+                code: 'INVALID_RESPONSE',
+                debug: { response: JSON.stringify(response) }
+            };
+        }
+
+        return {
+            status: 'processing',
+            taskId: response.taskId,
+            debug: response.debug || {}
+        };
+    } catch (error) {
+        const debugInfo = toSafeDebugInfo(error);
+        logger.error('Error handling text selection', debugInfo);
+        return {
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            code: 'SELECTION_ERROR',
+            debug: debugInfo
+        };
+    }
+}
 
 // Initialize content script
-async function initializeContentScript() {
+async function initializeContentScript(): Promise<void> {
     try {
-        // Initialize services
-        await Promise.all([
-            storageService.getSettings(),
-            speechService.getVoices()
-        ]);
+        // Send ready message to background script
+        const response = await messagingManager.sendMessage({
+            type: 'contentScriptReady'
+        } as ContentScriptReadyMessage);
 
-        // Initialize event listeners
-        setupEventListeners();
+        if (isErrorResponse(response)) {
+            const debugInfo = {
+                error: response.error,
+                code: response.code,
+                debug: response.debug || {}
+            };
+            logger.error('Failed to initialize content script', debugInfo);
+            return;
+        }
 
-        // Register message handlers
-        setupMessageHandlers();
+        logger.info('Content script initialized', response.debug || {});
 
-        // Signal content script is ready
-        const response = await messagingManager.sendMessage<'contentScriptReady'>({ 
-            type: 'contentScriptReady' 
-        });
-        logger.info('Content script ready signal acknowledged:', response);
-
-        // Mark content script as initialized
-        initManager.markInitialized('content', {
-            url: window.location.href,
-            voices: speechService.getVoices().length,
-            documentLang: document.documentElement.lang
-        });
-
-        logger.info('Content script initialized successfully');
-    } catch (error) {
-        initManager.markError('content', error instanceof Error ? error : 'Unknown error');
-        logger.error('Failed to initialize content script:', {
-            error: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-}
-
-function setupEventListeners() {
-    document.addEventListener('mouseup', handleTextSelection);
-    document.addEventListener('keyup', handleKeyboardShortcuts);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-}
-
-function setupMessageHandlers() {
-    messagingManager.registerHandler<'contextMenuAction'>(
-        'contextMenuAction',
-        async (message): Promise<ContextMenuActionResponse> => {
-            if (!initManager.isInitialized('content')) {
-                return {
-                    error: 'Content script not fully initialized',
-                    debug: initManager.debugInfo()
-                };
-            }
-
-            if (message.menuId === 'readText' && message.text) {
+        // Listen for context menu actions
+        chrome.runtime.onMessage.addListener(async (
+            message: ContextMenuActionMessage,
+            sender: chrome.runtime.MessageSender,
+            sendResponse: (response: ContextMenuActionResponse) => void
+        ) => {
+            if (message.type === 'contextMenuAction') {
                 try {
-                    const settings = await storageService.getTTSSettings();
-                    const processMessage: ProcessTextMessage = {
-                        type: 'processText',
-                        text: message.text,
-                        options: settings
-                    };
-
-                    const response = await messagingManager.sendMessage<'processText'>(processMessage);
-                    const processResponse = response as ProcessTextResponse;
-                    logger.info('Text processing response:', processResponse);
-
-                    if (processResponse.taskId && !processResponse.error) {
-                        // Start speech synthesis with current settings
-                        await speechService.speak(message.text, settings);
-                        return { 
-                            status: 'processing',
-                            taskId: processResponse.taskId
+                    if (!message.text) {
+                        const errorResponse: BaseErrorResponse = {
+                            status: 'error',
+                            error: 'No text provided',
+                            code: 'INVALID_INPUT',
+                            debug: { messageType: message.type }
                         };
+                        sendResponse(errorResponse);
+                        return true;
                     }
 
-                    return {
-                        error: processResponse.error || 'Failed to process text',
-                        debug: initManager.debugInfo()
-                    };
+                    const response = await handleTextSelection(message.text);
+                    if (isErrorResponse(response)) {
+                        const debugInfo = {
+                            error: response.error,
+                            code: response.code,
+                            debug: response.debug || {}
+                        };
+                        logger.error('Error processing text', debugInfo);
+                    } else {
+                        logger.info('Text processing started', {
+                            taskId: response.taskId,
+                            debug: response.debug || {}
+                        });
+                    }
+                    sendResponse(response);
                 } catch (error) {
-                    logger.error('Error processing text:', {
+                    const debugInfo = toSafeDebugInfo(error);
+                    logger.error('Error in context menu handler', debugInfo);
+                    const errorResponse: BaseErrorResponse = {
+                        status: 'error',
                         error: error instanceof Error ? error.message : 'Unknown error',
-                        debug: initManager.debugInfo()
-                    });
-                    return {
-                        error: error instanceof Error ? error.message : 'Unknown error',
-                        debug: initManager.debugInfo()
+                        code: 'CONTEXT_MENU_ERROR',
+                        debug: debugInfo
                     };
+                    sendResponse(errorResponse);
                 }
+                return true; // Keep the message channel open for async response
             }
+            return true;
+        });
 
-            return { error: 'Invalid menu action' };
-        }
-    );
-}
-
-// Event handlers
-function handleTextSelection(event: MouseEvent): void {
-    const selection = window.getSelection();
-    if (selection) {
-        const selectedText = selection.toString().trim();
-        if (selectedText) {
-            logger.debug('Text selected:', { length: selectedText.length });
-        }
+    } catch (error) {
+        const debugInfo = toSafeDebugInfo(error);
+        logger.error('Error initializing content script', debugInfo);
     }
-}
-
-async function handleKeyboardShortcuts(event: KeyboardEvent): Promise<void> {
-    // Handle keyboard shortcuts
-    if (event.ctrlKey && event.key === 'r') {
-        const selection = window.getSelection();
-        if (selection && selection.toString().trim()) {
-            try {
-                const settings = await storageService.getTTSSettings();
-                const response = await messagingManager.sendMessage<'processText'>({
-                    type: 'processText',
-                    text: selection.toString().trim(),
-                    options: settings
-                });
-                const processResponse = response as ProcessTextResponse;
-                
-                if (processResponse.taskId && !processResponse.error) {
-                    await speechService.speak(selection.toString().trim(), settings);
-                } else {
-                    logger.error('Error processing text:', {
-                        error: processResponse.error || 'Unknown error'
-                    });
-                }
-            } catch (error) {
-                logger.error('Error processing keyboard shortcut:', {
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                });
-            }
-        }
-    }
-}
-
-function handleVisibilityChange(): void {
-    const isHidden = document.hidden;
-    logger.debug('Visibility changed:', { hidden: isHidden });
-
-    if (isHidden && speechService.isSpeaking()) {
-        speechService.pause();
-    } else if (!isHidden && speechService.isPaused()) {
-        speechService.resume();
-    }
-}
-
-function handleBeforeUnload(): void {
-    logger.debug('Page unloading');
-    speechService.stop();
 }
 
 // Initialize the content script

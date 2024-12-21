@@ -1,71 +1,81 @@
-// Simple logger utility for Chrome extension
+// Logger utility for the extension
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS';
+export type LogValue = string | number | boolean | null | undefined | Record<string, any>;
 
-interface LogMessage {
-    timestamp: string;
-    level: LogLevel;
-    context: string;
-    message: string;
-    data?: Record<string, any>;
+export interface LogContext {
+    [key: string]: LogValue;
 }
 
 export interface Logger {
-    debug(message: string, data?: Record<string, any>): void;
-    info(message: string, data?: Record<string, any>): void;
-    warn(message: string, data?: Record<string, any>): void;
-    error(message: string | Error, data?: Record<string, any>): void;
-    success(message: string, data?: Record<string, any>): void;
-    createSubLogger(subContext: string): Logger;
+    debug<T extends LogContext = LogContext>(message: string, context?: T): void;
+    info<T extends LogContext = LogContext>(message: string, context?: T): void;
+    warn<T extends LogContext = LogContext>(message: string, context?: T): void;
+    error<T extends LogContext = LogContext>(message: string, context?: T): void;
 }
 
-class LoggerImpl implements Logger {
-    private context: string;
+class ConsoleLogger implements Logger {
+    private readonly namespace: string;
+    private readonly minLevel: LogLevel;
 
-    constructor(context: string) {
-        this.context = context;
+    constructor(namespace: string, minLevel: LogLevel = 'debug') {
+        this.namespace = namespace;
+        this.minLevel = minLevel;
     }
 
-    private _formatMessage(level: LogLevel, message: string, data: Record<string, any> = {}): LogMessage {
-        const timestamp = new Date().toISOString();
-        return {
-            timestamp,
-            level,
-            context: this.context,
-            message,
-            data
-        };
+    private shouldLog(level: LogLevel): boolean {
+        const levels: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+        const minLevelIndex = levels.indexOf(this.minLevel);
+        const currentLevelIndex = levels.indexOf(level);
+        return currentLevelIndex >= minLevelIndex;
     }
 
-    public debug(message: string, data?: Record<string, any>): void {
-        console.debug(this._formatMessage('DEBUG', message, data));
+    private formatMessage(level: LogLevel, message: string): string {
+        return `[${this.namespace}] [${level.toUpperCase()}] ${message}`;
     }
 
-    public info(message: string, data?: Record<string, any>): void {
-        console.info(this._formatMessage('INFO', message, data));
+    private formatContext<T extends LogContext>(context?: T): T | undefined {
+        if (!context) return undefined;
+        return context;
     }
 
-    public warn(message: string, data?: Record<string, any>): void {
-        console.warn(this._formatMessage('WARN', message, data));
+    debug<T extends LogContext>(message: string, context?: T): void {
+        if (!this.shouldLog('debug')) return;
+        if (context) {
+            console.debug(this.formatMessage('debug', message), this.formatContext(context));
+        } else {
+            console.debug(this.formatMessage('debug', message));
+        }
     }
 
-    public error(message: string | Error, data?: Record<string, any>): void {
-        const errorMessage = message instanceof Error ? message.message : message;
-        const errorData = message instanceof Error 
-            ? { ...data, stack: message.stack }
-            : data;
-        console.error(this._formatMessage('ERROR', errorMessage, errorData));
+    info<T extends LogContext>(message: string, context?: T): void {
+        if (!this.shouldLog('info')) return;
+        if (context) {
+            console.info(this.formatMessage('info', message), this.formatContext(context));
+        } else {
+            console.info(this.formatMessage('info', message));
+        }
     }
 
-    public success(message: string, data?: Record<string, any>): void {
-        console.info(this._formatMessage('SUCCESS', message, data));
+    warn<T extends LogContext>(message: string, context?: T): void {
+        if (!this.shouldLog('warn')) return;
+        if (context) {
+            console.warn(this.formatMessage('warn', message), this.formatContext(context));
+        } else {
+            console.warn(this.formatMessage('warn', message));
+        }
     }
 
-    public createSubLogger(subContext: string): Logger {
-        return new LoggerImpl(`${this.context}:${subContext}`);
+    error<T extends LogContext>(message: string, context?: T): void {
+        if (!this.shouldLog('error')) return;
+        if (context) {
+            console.error(this.formatMessage('error', message), this.formatContext(context));
+        } else {
+            console.error(this.formatMessage('error', message));
+        }
     }
 }
 
-export function createLogger(context: string): Logger {
-    return new LoggerImpl(context);
+export function createLogger(namespace: string, minLevel: LogLevel = 'debug'): Logger {
+    return new ConsoleLogger(namespace, minLevel);
 }

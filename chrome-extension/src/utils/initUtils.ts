@@ -1,11 +1,11 @@
 import { createLogger, Logger } from './logger';
+import { LogContext } from './logger';
 
-interface InitStatus {
+interface InitStatus extends LogContext {
     initialized: boolean;
     error?: string;
-    timestamp: number;
-    context: string;
-    details?: Record<string, any>;
+    message?: string;
+    [key: string]: any;
 }
 
 class InitializationManager {

@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "A Chrome extension that reads selected text",
   "scripts": {
-    "build": "webpack --config webpack.config.js",
+    "clean": "rm -rf dist",
+    "copy-static": "node scripts/copy-static.js",
+    "build": "npm run clean && webpack --config webpack.config.js && npm run copy-static",
     "watch": "webpack --config webpack.config.js --watch",
+    "dev": "npm run copy-static && npm run watch",
     "type-check": "tsc --noEmit",
     "type-check:watch": "tsc --noEmit --watch"
   },

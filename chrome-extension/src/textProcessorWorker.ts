@@ -1,30 +1,37 @@
 // Text processor worker for handling speech synthesis
-import { createLogger, Logger } from './utils/logger';
-import { celeryClient } from './utils/celeryClient';
+import { createLogger } from './utils/logger';
+import { CeleryClient } from './utils/celeryClient';
+import { config } from './config';
+import { LogContext } from './utils/logger';
 
-interface ProcessOptions {
+interface ProcessOptions extends LogContext {
+    language?: string;
+    voice?: string;
     rate?: number;
     pitch?: number;
     volume?: number;
-    language?: string;
     emotionalContext?: Record<string, any>;
     textStructure?: Record<string, any>;
+    [key: string]: any;
 }
 
-interface TaskResult {
+interface ProcessResult {
     taskId: string;
     status: string;
     result?: any;
     error?: string;
 }
 
+const logger = createLogger('TextProcessorWorker');
+
 class TextProcessorWorker {
     private static instance: TextProcessorWorker;
-    private logger: Logger;
+    private readonly celeryClient: CeleryClient;
+    private readonly logger = createLogger('TextProcessorWorker');
     private currentOptions: ProcessOptions;
 
     private constructor() {
-        this.logger = createLogger('TextProcessor');
+        this.celeryClient = new CeleryClient(config.API_ENDPOINT);
         this.currentOptions = {
             rate: 1.0,
             pitch: 1.0,
@@ -39,35 +46,55 @@ class TextProcessorWorker {
         return TextProcessorWorker.instance;
     }
 
-    public async processText(text: string, options: ProcessOptions = {}): Promise<TaskResult> {
+    public async processText(text: string, options: ProcessOptions = {}): Promise<ProcessResult> {
         try {
             // Merge options with defaults
             const processOptions = {
-                ...this.currentOptions,
+                language: options.language || 'en-US',
+                rate: options.rate || 1.0,
+                pitch: options.pitch || 1.0,
+                volume: options.volume || 1.0,
                 ...options
             };
 
-            // Log the processing request
-            this.logger.debug('Processing text', {
-                textLength: text.length,
-                options: processOptions
+            // Merge options with current options
+            const mergedOptions = {
+                ...this.currentOptions,
+                ...processOptions
+            };
+
+            this.logger.info('Processing text', { 
+                length: text.length, 
+                options: mergedOptions 
             });
 
             // Submit the task to Celery
-            const { taskId } = await celeryClient.processText(text, processOptions);
+            const taskId = await this.celeryClient.processText(text, mergedOptions);
+            const result = await this.celeryClient.pollTaskStatus(taskId);
+            
+            this.logger.info('Text processing result', { 
+                taskId, 
+                status: result.status,
+                error: result.error || undefined
+            });
+
             return {
-                taskId,
-                status: 'PENDING'
+                taskId: result.taskId,
+                status: result.status,
+                result: result.result,
+                error: result.error
             };
         } catch (error) {
-            this.logger.error('Error processing text:', { error: error instanceof Error ? error.message : 'Unknown error' });
+            this.logger.error('Error processing text', { 
+                error: error instanceof Error ? error.message : String(error) 
+            });
             throw error;
         }
     }
 
     public async pollTaskStatus(taskId: string): Promise<any> {
         try {
-            return await celeryClient.pollTaskStatus(taskId);
+            return await this.celeryClient.pollTaskStatus(taskId);
         } catch (error) {
             this.logger.error('Error polling task status:', { error: error instanceof Error ? error.message : 'Unknown error' });
             throw error;
@@ -92,5 +119,26 @@ class TextProcessorWorker {
     }
 }
 
-// Export singleton instance
-export const textProcessorWorker = TextProcessorWorker.getInstance();
+const textProcessor = TextProcessorWorker.getInstance();
+
+self.onmessage = async (event: MessageEvent) => {
+    const { text, options = {} } = event.data;
+
+    try {
+        logger.info('Processing text in worker', { length: text.length });
+
+        const result = await textProcessor.processText(text, options);
+        self.postMessage({
+            type: 'success',
+            result
+        });
+    } catch (error) {
+        logger.error('Error processing text in worker', { 
+            error: error instanceof Error ? error.message : String(error) 
+        });
+        self.postMessage({
+            type: 'error',
+            error: error instanceof Error ? error.message : String(error)
+        });
+    }
+};
