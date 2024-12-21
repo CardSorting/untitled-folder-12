@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from language_utils.text_processor import TextProcessor
 from language_utils import detect_language
+import ssl
 
 load_dotenv()
 
@@ -13,19 +14,32 @@ REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '')
 REDIS_SSL = os.getenv('REDIS_SSL', 'False').lower() == 'true'
 
+# Redis URL configuration
+REDIS_URL = f"redis{'s' if REDIS_SSL else ''}://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+if REDIS_SSL:
+    REDIS_URL += "?ssl_cert_reqs=CERT_NONE"
+
 # Initialize Redis client
 redis_client = Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
     password=REDIS_PASSWORD,
     ssl=REDIS_SSL,
-    ssl_cert_reqs=None  # Disable certificate verification for development
+    ssl_cert_reqs=ssl.CERT_NONE if REDIS_SSL else None
 )
 
 # Initialize Celery
 app = Celery('text_processor')
-app.conf.broker_url = f"redis{'s' if REDIS_SSL else ''}://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
-app.conf.result_backend = f"redis{'s' if REDIS_SSL else ''}://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+app.conf.update(
+    broker_url=REDIS_URL,
+    result_backend=REDIS_URL,
+    broker_use_ssl={
+        'ssl_cert_reqs': ssl.CERT_NONE
+    } if REDIS_SSL else None,
+    redis_backend_use_ssl={
+        'ssl_cert_reqs': ssl.CERT_NONE
+    } if REDIS_SSL else None
+)
 
 # Initialize text processor
 text_processor = TextProcessor()

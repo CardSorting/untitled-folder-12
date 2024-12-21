@@ -1,23 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from celery_worker import app as celery_app
+from celery_worker import app as celery_app, redis_client
 from celery.result import AsyncResult
 from dotenv import load_dotenv
 import json
 import os
-import redis
 
 # Load environment variables
 load_dotenv()
-
-# Initialize Redis client
-redis_client = redis.Redis(
-    host=os.getenv('REDIS_HOST'),
-    port=int(os.getenv('REDIS_PORT')),
-    password=os.getenv('REDIS_PASSWORD'),
-    ssl=True,
-    ssl_cert_reqs=None
-)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -63,4 +53,4 @@ def task_status(task_id):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
