@@ -7,6 +7,10 @@ interface Config {
         pollInterval: number;
         maxRetries: number;
     };
+    endpoints: {
+        processText: string;
+        taskStatus: string;
+    };
 }
 
 export const config: Config = {
@@ -15,5 +19,9 @@ export const config: Config = {
         timeout: 30000, // 30 seconds
         pollInterval: 1000, // 1 second
         maxRetries: 3
+    },
+    endpoints: {
+        processText: '/process_text',
+        taskStatus: '/task_status'
     }
 };

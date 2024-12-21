@@ -41,12 +41,14 @@ export class CeleryClient {
     constructor(baseUrl: string = config.API_ENDPOINT) {
         this.logger = createLogger('CeleryClient');
         this.baseUrl = baseUrl;
-        this.taskEndpoint = `${this.baseUrl}/process_text`;
-        this.statusEndpoint = `${this.baseUrl}/task_status`;
+        this.taskEndpoint = `${this.baseUrl}${config.endpoints.processText}`;
+        this.statusEndpoint = `${this.baseUrl}${config.endpoints.taskStatus}`;
         this.config = config.celery;
         
         this.logger.info('CeleryClient initialized', {
             baseUrl: this.baseUrl,
+            taskEndpoint: this.taskEndpoint,
+            statusEndpoint: this.statusEndpoint,
             timeout: this.config.timeout
         });
     }
