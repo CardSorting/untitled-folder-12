@@ -10,18 +10,17 @@
     "storage"
   ],
   "background": {
-    "service_worker": "dist/background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["dist/content.js"],
+      "js": ["content.js"],
       "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [{
-    "resources": ["dist/textProcessorWorker.js"],
+    "resources": ["textProcessorWorker.js"],
     "matches": ["<all_urls>"]
   }],
   "icons": {
