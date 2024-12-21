@@ -1,0 +1,20 @@
+[Unit]
+Description=Text Processor Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/text-processor
+Environment=FLASK_ENV=production
+EnvironmentFile=/home/ubuntu/text-processor/.env
+
+# Start Gunicorn for Flask app
+ExecStart=/home/ubuntu/text-processor/venv/bin/gunicorn -c gunicorn.conf.py app:app
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
