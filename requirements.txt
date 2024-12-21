@@ -1,0 +1,6 @@
+Flask==3.0.0
+flask-cors==4.0.0
+celery==5.3.4
+certifi==2024.2.2
+gunicorn==21.2.0
+python-dotenv==1.0.0
