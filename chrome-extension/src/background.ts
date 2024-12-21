@@ -58,12 +58,19 @@ class BackgroundController {
 
     private initializeListeners(): void {
         // Listen for messages from content scripts
-        chrome.runtime.onMessage.addListener((request: ProcessTextRequest, sender, sendResponse) => {
-            if (request.type === 'processText' && sender.tab?.id) {
-                this.handleProcessText(request, sender.tab.id)
-                    .then(response => sendResponse(response))
-                    .catch(error => sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' }));
-                return true; // Will respond asynchronously
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            if (sender.tab?.id) {
+                if (request.type === 'contentScriptReady') {
+                    this.logger.info('Content script ready in tab:', { tabId: sender.tab.id });
+                    return;
+                }
+                
+                if (request.type === 'processText') {
+                    this.handleProcessText(request, sender.tab.id)
+                        .then(response => sendResponse(response))
+                        .catch(error => sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' }));
+                    return true; // Will respond asynchronously
+                }
             }
             return false;
         });
@@ -115,8 +122,14 @@ class BackgroundController {
     private async notifyContentScript(tabId: number, message: any): Promise<void> {
         try {
             await chrome.tabs.sendMessage(tabId, message);
-        } catch (error) {
+        } catch (error: unknown) {
+            // If the content script is not ready, retry after a short delay
+            if (error instanceof Error && error.message.includes('Receiving end does not exist')) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                return this.notifyContentScript(tabId, message);
+            }
             this.logger.error('Error notifying content script:', { error: error instanceof Error ? error.message : 'Unknown error' });
+            throw error;
         }
     }
 }

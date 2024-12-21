@@ -10,7 +10,8 @@ module.exports = {
   },
   output: {
     filename: '[name].js',
-    path: path.resolve(__dirname, 'dist')
+    path: path.resolve(__dirname, 'dist'),
+    clean: true // This will clean the output directory before each build
   },
   module: {
     rules: [
@@ -18,18 +19,24 @@ module.exports = {
         test: /\.tsx?$/,
         use: [
           {
-            loader: 'babel-loader',
+            loader: 'ts-loader',
             options: {
-              presets: ['@babel/preset-env', '@babel/preset-typescript']
+              compilerOptions: {
+                module: 'es2015',
+                moduleResolution: 'node'
+              }
             }
-          },
-          'ts-loader'
+          }
         ],
         exclude: /node_modules/
       }
     ]
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js']
+    extensions: ['.tsx', '.ts', '.js'],
+    modules: ['node_modules']
+  },
+  experiments: {
+    topLevelAwait: true
   }
 };

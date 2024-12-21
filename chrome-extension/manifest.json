@@ -6,17 +6,24 @@
   "permissions": [
     "activeTab",
     "contextMenus",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "background": {
-    "service_worker": "background.bundle.js"
+    "service_worker": "dist/background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.bundle.js"]
+      "js": ["dist/content.js"],
+      "run_at": "document_end"
     }
   ],
+  "web_accessible_resources": [{
+    "resources": ["dist/textProcessorWorker.js"],
+    "matches": ["<all_urls>"]
+  }],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

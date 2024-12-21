@@ -50,13 +50,16 @@ class ContentController {
                 language: document.documentElement.lang || 'en'
             }
         };
+
+        // Initialize web speech synthesis
         this.speechSynthesis = window.speechSynthesis;
         this.voices = [];
 
-        // Initialize voices and listeners
-        this.initializeVoices();
+        // Initialize listeners
         this.initializeListeners();
-        this.loadSettings();
+        
+        // Signal that content script is ready
+        chrome.runtime.sendMessage({ type: 'contentScriptReady' });
     }
 
     public static getInstance(): ContentController {
