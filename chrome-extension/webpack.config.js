@@ -22,7 +22,7 @@ module.exports = {
             loader: 'ts-loader',
             options: {
               compilerOptions: {
-                module: 'ES2020'
+                module: 'commonjs'
               }
             }
           }
@@ -32,13 +32,9 @@ module.exports = {
     ]
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
-    modules: ['node_modules']
+    extensions: ['.tsx', '.ts', '.js']
   },
   optimization: {
-    minimize: false // Disable minification for better debugging
-  },
-  experiments: {
-    topLevelAwait: true,
-  },
+    minimize: false
+  }
 };

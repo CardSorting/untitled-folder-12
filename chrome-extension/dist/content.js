@@ -6,17 +6,15 @@
 /*!********************************!*\
   !*** ./src/utils/initUtils.ts ***!
   \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   initManager: () => (/* binding */ initManager)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
 
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.initManager = void 0;
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
 class InitializationManager {
     constructor() {
-        this.logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('InitManager');
+        this.logger = (0, logger_1.createLogger)('InitManager');
         this.initStatus = new Map();
         this.readyCallbacks = new Map();
         // Listen for extension lifecycle events
@@ -162,7 +160,7 @@ class InitializationManager {
         };
     }
 }
-const initManager = InitializationManager.getInstance();
+exports.initManager = InitializationManager.getInstance();
 
 
 /***/ }),
@@ -171,12 +169,11 @@ const initManager = InitializationManager.getInstance();
 /*!*****************************!*\
   !*** ./src/utils/logger.ts ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   createLogger: () => (/* binding */ createLogger)
-/* harmony export */ });
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createLogger = createLogger;
 class ConsoleLogger {
     constructor(namespace, minLevel = 'debug') {
         this.namespace = namespace;
@@ -248,17 +245,14 @@ function createLogger(namespace, minLevel = 'debug') {
 /*!********************************!*\
   !*** ./src/utils/messaging.ts ***!
   \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   messagingManager: () => (/* binding */ messagingManager)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _initUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./initUtils */ "./src/utils/initUtils.ts");
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('Messaging');
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.messagingManager = void 0;
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const initUtils_1 = __webpack_require__(/*! ./initUtils */ "./src/utils/initUtils.ts");
+const logger = (0, logger_1.createLogger)('Messaging');
 class MessagingManager {
     constructor() {
         this.handlers = new Map();
@@ -278,7 +272,7 @@ class MessagingManager {
                 logger.warn('No handler registered for message type:', { type: message.type });
                 sendResponse({
                     error: `No handler for message type: ${message.type}`,
-                    debug: _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                    debug: initUtils_1.initManager.debugInfo()
                 });
                 return false;
             }
@@ -294,7 +288,7 @@ class MessagingManager {
                 });
                 sendResponse({
                     error: error instanceof Error ? error.message : 'Unknown error',
-                    debug: _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                    debug: initUtils_1.initManager.debugInfo()
                 });
             });
             return true; // Will respond asynchronously
@@ -336,7 +330,7 @@ class MessagingManager {
         }
     }
 }
-const messagingManager = MessagingManager.getInstance();
+exports.messagingManager = MessagingManager.getInstance();
 
 
 /***/ })
@@ -368,48 +362,19 @@ const messagingManager = MessagingManager.getInstance();
 /******/ 	}
 /******/ 	
 /************************************************************************/
-/******/ 	/* webpack/runtime/define property getters */
-/******/ 	(() => {
-/******/ 		// define getter functions for harmony exports
-/******/ 		__webpack_require__.d = (exports, definition) => {
-/******/ 			for(var key in definition) {
-/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
-/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
-/******/ 				}
-/******/ 			}
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
-/******/ 	(() => {
-/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/make namespace object */
-/******/ 	(() => {
-/******/ 		// define __esModule on exports
-/******/ 		__webpack_require__.r = (exports) => {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 			}
-/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/************************************************************************/
 var __webpack_exports__ = {};
 // This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
 (() => {
+var exports = __webpack_exports__;
 /*!************************!*\
   !*** ./src/content.ts ***!
   \************************/
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _utils_logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils/logger */ "./src/utils/logger.ts");
-/* harmony import */ var _utils_messaging__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils/messaging */ "./src/utils/messaging.ts");
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
 // Content script for handling text selection and TTS
-
-
-const logger = (0,_utils_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('Content');
+const logger_1 = __webpack_require__(/*! ./utils/logger */ "./src/utils/logger.ts");
+const messaging_1 = __webpack_require__(/*! ./utils/messaging */ "./src/utils/messaging.ts");
+const logger = (0, logger_1.createLogger)('Content');
 // Type guard for process text success response
 function isProcessTextSuccessResponse(response) {
     return response &&
@@ -445,7 +410,7 @@ function toSafeDebugInfo(error) {
 async function handleTextSelection(text) {
     try {
         logger.info('Processing selected text');
-        const response = await _utils_messaging__WEBPACK_IMPORTED_MODULE_1__.messagingManager.sendMessage({
+        const response = await messaging_1.messagingManager.sendMessage({
             type: 'processText',
             text
         });
@@ -486,7 +451,7 @@ async function handleTextSelection(text) {
 async function initializeContentScript() {
     try {
         // Send ready message to background script
-        const response = await _utils_messaging__WEBPACK_IMPORTED_MODULE_1__.messagingManager.sendMessage({
+        const response = await messaging_1.messagingManager.sendMessage({
             type: 'contentScriptReady'
         });
         if (isErrorResponse(response)) {

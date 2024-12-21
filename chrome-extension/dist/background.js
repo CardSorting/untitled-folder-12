@@ -6,14 +6,13 @@
 /*!***********************!*\
   !*** ./src/config.ts ***!
   \***********************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   config: () => (/* binding */ config)
-/* harmony export */ });
+
 // Configuration for the Chrome extension
-const config = {
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.config = void 0;
+exports.config = {
     API_ENDPOINT: 'http://localhost:5001', // Default local development server
     celery: {
         timeout: 30000, // 30 seconds
@@ -33,15 +32,13 @@ const config = {
 /*!*********************************!*\
   !*** ./src/services/storage.ts ***!
   \*********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   StorageService: () => (/* binding */ StorageService)
-/* harmony export */ });
-/* harmony import */ var _utils_logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../utils/logger */ "./src/utils/logger.ts");
 
-const logger = (0,_utils_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('Storage');
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.StorageService = void 0;
+const logger_1 = __webpack_require__(/*! ../utils/logger */ "./src/utils/logger.ts");
+const logger = (0, logger_1.createLogger)('Storage');
 const DEFAULT_SETTINGS = {
     ttsSettings: {
         rate: 1.0,
@@ -106,6 +103,7 @@ class StorageService {
         });
     }
 }
+exports.StorageService = StorageService;
 
 
 /***/ }),
@@ -114,21 +112,17 @@ class StorageService {
 /*!***********************************!*\
   !*** ./src/utils/celeryClient.ts ***!
   \***********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   CeleryClient: () => (/* binding */ CeleryClient),
-/* harmony export */   celeryClient: () => (/* binding */ celeryClient)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../config */ "./src/config.ts");
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.celeryClient = exports.CeleryClient = void 0;
 // Celery client for handling text processing tasks
-
-
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('CeleryClient');
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const config_1 = __webpack_require__(/*! ../config */ "./src/config.ts");
+const logger = (0, logger_1.createLogger)('CeleryClient');
 class CeleryClient {
-    constructor(baseUrl = _config__WEBPACK_IMPORTED_MODULE_1__.config.API_ENDPOINT, pollInterval = 1000, maxRetries = 3) {
+    constructor(baseUrl = config_1.config.API_ENDPOINT, pollInterval = 1000, maxRetries = 3) {
         this.baseUrl = baseUrl;
         this.taskQueue = new Map();
         this.pollInterval = pollInterval;
@@ -136,7 +130,7 @@ class CeleryClient {
     }
     async processText(text, options = {}) {
         try {
-            const response = await fetch(`${this.baseUrl}${_config__WEBPACK_IMPORTED_MODULE_1__.config.endpoints.processText}`, {
+            const response = await fetch(`${this.baseUrl}${config_1.config.endpoints.processText}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -179,7 +173,7 @@ class CeleryClient {
     }
     async getTaskResult(taskId) {
         try {
-            const response = await fetch(`${this.baseUrl}${_config__WEBPACK_IMPORTED_MODULE_1__.config.endpoints.taskStatus}/${taskId}`);
+            const response = await fetch(`${this.baseUrl}${config_1.config.endpoints.taskStatus}/${taskId}`);
             if (!response.ok) {
                 throw new Error(`Failed to get task status: ${response.statusText}`);
             }
@@ -272,7 +266,7 @@ class CeleryClient {
     }
     async cancelTask(taskId) {
         try {
-            const response = await fetch(`${this.baseUrl}${_config__WEBPACK_IMPORTED_MODULE_1__.config.endpoints.taskStatus}/${taskId}/cancel`, {
+            const response = await fetch(`${this.baseUrl}${config_1.config.endpoints.taskStatus}/${taskId}/cancel`, {
                 method: 'POST'
             });
             if (!response.ok) {
@@ -288,8 +282,9 @@ class CeleryClient {
         }
     }
 }
+exports.CeleryClient = CeleryClient;
 // Export singleton instance
-const celeryClient = new CeleryClient();
+exports.celeryClient = new CeleryClient();
 
 
 /***/ }),
@@ -298,18 +293,14 @@ const celeryClient = new CeleryClient();
 /*!**********************************!*\
   !*** ./src/utils/contextMenu.ts ***!
   \**********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   ContextMenuManager: () => (/* binding */ ContextMenuManager),
-/* harmony export */   contextMenuManager: () => (/* binding */ contextMenuManager)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _messaging__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./messaging */ "./src/utils/messaging.ts");
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('ContextMenu');
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.contextMenuManager = exports.ContextMenuManager = void 0;
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const messaging_1 = __webpack_require__(/*! ./messaging */ "./src/utils/messaging.ts");
+const logger = (0, logger_1.createLogger)('ContextMenu');
 class ContextMenuManager {
     constructor() {
         this.menuItems = new Map();
@@ -392,7 +383,7 @@ class ContextMenuManager {
                 menuId: info.menuItemId.toString(),
                 text: info.selectionText || ''
             };
-            _messaging__WEBPACK_IMPORTED_MODULE_1__.messagingManager.sendMessage(message).catch(error => {
+            messaging_1.messagingManager.sendMessage(message).catch(error => {
                 logger.error('Error sending context menu message', {
                     error: error instanceof Error ? error.message : String(error),
                     message
@@ -407,7 +398,8 @@ class ContextMenuManager {
         }
     }
 }
-const contextMenuManager = ContextMenuManager.getInstance();
+exports.ContextMenuManager = ContextMenuManager;
+exports.contextMenuManager = ContextMenuManager.getInstance();
 
 
 /***/ }),
@@ -416,24 +408,15 @@ const contextMenuManager = ContextMenuManager.getInstance();
 /*!***********************************!*\
   !*** ./src/utils/errorHandler.ts ***!
   \***********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   ErrorHandler: () => (/* binding */ ErrorHandler),
-/* harmony export */   ExtensionError: () => (/* binding */ ExtensionError),
-/* harmony export */   InitializationError: () => (/* binding */ InitializationError),
-/* harmony export */   PermissionError: () => (/* binding */ PermissionError),
-/* harmony export */   ProcessingError: () => (/* binding */ ProcessingError),
-/* harmony export */   RuntimeError: () => (/* binding */ RuntimeError),
-/* harmony export */   errorHandler: () => (/* binding */ errorHandler)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _initUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./initUtils */ "./src/utils/initUtils.ts");
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.errorHandler = exports.ErrorHandler = exports.ProcessingError = exports.RuntimeError = exports.PermissionError = exports.InitializationError = exports.ExtensionError = void 0;
 // Error handling utility
-
-
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('ErrorHandler');
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const initUtils_1 = __webpack_require__(/*! ./initUtils */ "./src/utils/initUtils.ts");
+const logger = (0, logger_1.createLogger)('ErrorHandler');
 // Custom error types
 class ExtensionError extends Error {
     constructor(message, code, context = {}) {
@@ -443,30 +426,35 @@ class ExtensionError extends Error {
         this.context = context;
     }
 }
+exports.ExtensionError = ExtensionError;
 class InitializationError extends ExtensionError {
     constructor(message, context = {}) {
         super(message, 'INIT_ERROR', context);
         this.name = 'InitializationError';
     }
 }
+exports.InitializationError = InitializationError;
 class PermissionError extends ExtensionError {
     constructor(message, context = {}) {
         super(message, 'PERMISSION_ERROR', context);
         this.name = 'PermissionError';
     }
 }
+exports.PermissionError = PermissionError;
 class RuntimeError extends ExtensionError {
     constructor(message, context = {}) {
         super(message, 'RUNTIME_ERROR', context);
         this.name = 'RuntimeError';
     }
 }
+exports.RuntimeError = RuntimeError;
 class ProcessingError extends ExtensionError {
     constructor(message, context = {}) {
         super(message, 'PROCESSING_ERROR', context);
         this.name = 'ProcessingError';
     }
 }
+exports.ProcessingError = ProcessingError;
 // Error handler class
 class ErrorHandler {
     constructor() { }
@@ -484,7 +472,7 @@ class ErrorHandler {
             timestamp: Date.now(),
             runtimeAvailable: !!chrome.runtime,
             extensionId: chrome.runtime?.id,
-            isInitialized: _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.isInitialized('background')
+            isInitialized: initUtils_1.initManager.isInitialized('background')
         };
         if (error instanceof ExtensionError) {
             errorMessage = error.message;
@@ -538,8 +526,8 @@ class ErrorHandler {
     }
     async validatePermissions() {
         try {
-            const permissions = await _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.checkPermissions();
-            const hostPermissions = await _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.validateHostPermissions();
+            const permissions = await initUtils_1.initManager.checkPermissions();
+            const hostPermissions = await initUtils_1.initManager.validateHostPermissions();
             if (!permissions || !hostPermissions) {
                 throw new PermissionError('Required permissions not granted', {
                     permissions,
@@ -570,13 +558,14 @@ class ErrorHandler {
             error: message,
             code,
             debug: {
-                ..._initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo(),
+                ...initUtils_1.initManager.debugInfo(),
                 errorContext: context
             }
         };
     }
 }
-const errorHandler = ErrorHandler.getInstance();
+exports.ErrorHandler = ErrorHandler;
+exports.errorHandler = ErrorHandler.getInstance();
 
 
 /***/ }),
@@ -585,17 +574,15 @@ const errorHandler = ErrorHandler.getInstance();
 /*!********************************!*\
   !*** ./src/utils/initUtils.ts ***!
   \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   initManager: () => (/* binding */ initManager)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
 
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.initManager = void 0;
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
 class InitializationManager {
     constructor() {
-        this.logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('InitManager');
+        this.logger = (0, logger_1.createLogger)('InitManager');
         this.initStatus = new Map();
         this.readyCallbacks = new Map();
         // Listen for extension lifecycle events
@@ -741,7 +728,7 @@ class InitializationManager {
         };
     }
 }
-const initManager = InitializationManager.getInstance();
+exports.initManager = InitializationManager.getInstance();
 
 
 /***/ }),
@@ -750,12 +737,11 @@ const initManager = InitializationManager.getInstance();
 /*!*****************************!*\
   !*** ./src/utils/logger.ts ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   createLogger: () => (/* binding */ createLogger)
-/* harmony export */ });
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createLogger = createLogger;
 class ConsoleLogger {
     constructor(namespace, minLevel = 'debug') {
         this.namespace = namespace;
@@ -827,17 +813,14 @@ function createLogger(namespace, minLevel = 'debug') {
 /*!********************************!*\
   !*** ./src/utils/messaging.ts ***!
   \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   messagingManager: () => (/* binding */ messagingManager)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _initUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./initUtils */ "./src/utils/initUtils.ts");
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('Messaging');
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.messagingManager = void 0;
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const initUtils_1 = __webpack_require__(/*! ./initUtils */ "./src/utils/initUtils.ts");
+const logger = (0, logger_1.createLogger)('Messaging');
 class MessagingManager {
     constructor() {
         this.handlers = new Map();
@@ -857,7 +840,7 @@ class MessagingManager {
                 logger.warn('No handler registered for message type:', { type: message.type });
                 sendResponse({
                     error: `No handler for message type: ${message.type}`,
-                    debug: _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                    debug: initUtils_1.initManager.debugInfo()
                 });
                 return false;
             }
@@ -873,7 +856,7 @@ class MessagingManager {
                 });
                 sendResponse({
                     error: error instanceof Error ? error.message : 'Unknown error',
-                    debug: _initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                    debug: initUtils_1.initManager.debugInfo()
                 });
             });
             return true; // Will respond asynchronously
@@ -915,7 +898,7 @@ class MessagingManager {
         }
     }
 }
-const messagingManager = MessagingManager.getInstance();
+exports.messagingManager = MessagingManager.getInstance();
 
 
 /***/ }),
@@ -924,20 +907,16 @@ const messagingManager = MessagingManager.getInstance();
 /*!************************************!*\
   !*** ./src/utils/textProcessor.ts ***!
   \************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   textProcessingManager: () => (/* binding */ textProcessingManager)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _celeryClient__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./celeryClient */ "./src/utils/celeryClient.ts");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../config */ "./src/config.ts");
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 
-
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('TextProcessor');
-const celeryClient = new _celeryClient__WEBPACK_IMPORTED_MODULE_1__.CeleryClient(_config__WEBPACK_IMPORTED_MODULE_2__.config.API_ENDPOINT);
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.textProcessingManager = void 0;
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const celeryClient_1 = __webpack_require__(/*! ./celeryClient */ "./src/utils/celeryClient.ts");
+const config_1 = __webpack_require__(/*! ../config */ "./src/config.ts");
+const logger = (0, logger_1.createLogger)('TextProcessor');
+const celeryClient = new celeryClient_1.CeleryClient(config_1.config.API_ENDPOINT);
 class TextProcessingManager {
     constructor() {
         this.activeTasks = new Map();
@@ -952,7 +931,7 @@ class TextProcessingManager {
     async setup() {
         try {
             // Check if Celery API is available
-            const response = await fetch(`${_config__WEBPACK_IMPORTED_MODULE_2__.config.API_ENDPOINT}/health`, {
+            const response = await fetch(`${config_1.config.API_ENDPOINT}/health`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1042,7 +1021,7 @@ class TextProcessingManager {
         logger.debug('Task cleaned up:', { taskId });
     }
 }
-const textProcessingManager = TextProcessingManager.getInstance();
+exports.textProcessingManager = TextProcessingManager.getInstance();
 
 
 /***/ })
@@ -1074,65 +1053,31 @@ const textProcessingManager = TextProcessingManager.getInstance();
 /******/ 	}
 /******/ 	
 /************************************************************************/
-/******/ 	/* webpack/runtime/define property getters */
-/******/ 	(() => {
-/******/ 		// define getter functions for harmony exports
-/******/ 		__webpack_require__.d = (exports, definition) => {
-/******/ 			for(var key in definition) {
-/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
-/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
-/******/ 				}
-/******/ 			}
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
-/******/ 	(() => {
-/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/make namespace object */
-/******/ 	(() => {
-/******/ 		// define __esModule on exports
-/******/ 		__webpack_require__.r = (exports) => {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 			}
-/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/************************************************************************/
 var __webpack_exports__ = {};
 // This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
 (() => {
+var exports = __webpack_exports__;
 /*!***************************!*\
   !*** ./src/background.ts ***!
   \***************************/
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _utils_logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils/logger */ "./src/utils/logger.ts");
-/* harmony import */ var _utils_initUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils/initUtils */ "./src/utils/initUtils.ts");
-/* harmony import */ var _utils_messaging__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./utils/messaging */ "./src/utils/messaging.ts");
-/* harmony import */ var _utils_contextMenu__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./utils/contextMenu */ "./src/utils/contextMenu.ts");
-/* harmony import */ var _utils_textProcessor__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./utils/textProcessor */ "./src/utils/textProcessor.ts");
-/* harmony import */ var _services_storage__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./services/storage */ "./src/services/storage.ts");
-/* harmony import */ var _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./utils/errorHandler */ "./src/utils/errorHandler.ts");
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
 // Background script for handling text-to-speech processing
-
-
-
-
-
-
-
-const logger = (0,_utils_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('Background');
-const storageService = _services_storage__WEBPACK_IMPORTED_MODULE_5__.StorageService.getInstance();
+const logger_1 = __webpack_require__(/*! ./utils/logger */ "./src/utils/logger.ts");
+const initUtils_1 = __webpack_require__(/*! ./utils/initUtils */ "./src/utils/initUtils.ts");
+const messaging_1 = __webpack_require__(/*! ./utils/messaging */ "./src/utils/messaging.ts");
+const contextMenu_1 = __webpack_require__(/*! ./utils/contextMenu */ "./src/utils/contextMenu.ts");
+const textProcessor_1 = __webpack_require__(/*! ./utils/textProcessor */ "./src/utils/textProcessor.ts");
+const storage_1 = __webpack_require__(/*! ./services/storage */ "./src/services/storage.ts");
+const errorHandler_1 = __webpack_require__(/*! ./utils/errorHandler */ "./src/utils/errorHandler.ts");
+const logger = (0, logger_1.createLogger)('Background');
+const storageService = storage_1.StorageService.getInstance();
 // Initialize the extension
 async function initializeExtension(details) {
     try {
         // Ensure we're in a service worker context
         if (!chrome.runtime.id) {
-            throw new _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.InitializationError('Extension ID not available', {
+            throw new errorHandler_1.InitializationError('Extension ID not available', {
                 code: 'INVALID_CONTEXT'
             });
         }
@@ -1140,12 +1085,12 @@ async function initializeExtension(details) {
         // Initialize core services
         await Promise.all([
             storageService.getSettings(),
-            _utils_contextMenu__WEBPACK_IMPORTED_MODULE_3__.contextMenuManager.createContextMenu({
+            contextMenu_1.contextMenuManager.createContextMenu({
                 id: 'readSelectedText',
                 title: 'Read Selected Text',
                 contexts: ['selection']
             }),
-            _utils_textProcessor__WEBPACK_IMPORTED_MODULE_4__.textProcessingManager.setup()
+            textProcessor_1.textProcessingManager.setup()
         ]);
         logger.info('Extension initialized successfully', { status: 'success' });
     }
@@ -1168,7 +1113,7 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 // Handle unhandled errors and rejections
 window.addEventListener('error', (event) => {
-    _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.handleError(event.error, {
+    errorHandler_1.errorHandler.handleError(event.error, {
         source: 'window.error',
         message: event.message,
         filename: event.filename,
@@ -1177,7 +1122,7 @@ window.addEventListener('error', (event) => {
     });
 });
 window.addEventListener('unhandledrejection', (event) => {
-    _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.handleError(event.reason, {
+    errorHandler_1.errorHandler.handleError(event.reason, {
         source: 'unhandledrejection',
         message: event.reason?.message || 'Unknown promise rejection'
     });
@@ -1185,17 +1130,17 @@ window.addEventListener('unhandledrejection', (event) => {
 // Initialize extension
 async function setupMessageHandlers() {
     // Handle content script ready message
-    _utils_messaging__WEBPACK_IMPORTED_MODULE_2__.messagingManager.registerHandler('contentScriptReady', async (message) => {
+    messaging_1.messagingManager.registerHandler('contentScriptReady', async (message) => {
         try {
-            await _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.checkRuntimeHealth();
+            await errorHandler_1.errorHandler.checkRuntimeHealth();
             logger.info('Content script ready');
             return {
                 status: 'acknowledged',
-                debug: _utils_initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                debug: initUtils_1.initManager.debugInfo()
             };
         }
         catch (error) {
-            const { error: errorMessage, code, debug } = _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.getErrorResponse(error);
+            const { error: errorMessage, code, debug } = errorHandler_1.errorHandler.getErrorResponse(error);
             return {
                 status: 'error',
                 error: errorMessage,
@@ -1205,11 +1150,11 @@ async function setupMessageHandlers() {
         }
     });
     // Handle text processing request
-    _utils_messaging__WEBPACK_IMPORTED_MODULE_2__.messagingManager.registerHandler('processText', async (message) => {
+    messaging_1.messagingManager.registerHandler('processText', async (message) => {
         try {
-            await _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.checkRuntimeHealth();
-            if (!_utils_initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.isInitialized('background')) {
-                throw new _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.InitializationError('Background script not fully initialized', {
+            await errorHandler_1.errorHandler.checkRuntimeHealth();
+            if (!initUtils_1.initManager.isInitialized('background')) {
+                throw new errorHandler_1.InitializationError('Background script not fully initialized', {
                     code: 'INVALID_STATE'
                 });
             }
@@ -1220,9 +1165,9 @@ async function setupMessageHandlers() {
                 ...ttsSettings,
                 ...message.options
             };
-            const result = await _utils_textProcessor__WEBPACK_IMPORTED_MODULE_4__.textProcessingManager.processText(message.text, options);
+            const result = await textProcessor_1.textProcessingManager.processText(message.text, options);
             if (!result || !result.taskId) {
-                throw new _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.ProcessingError('Failed to process text', {
+                throw new errorHandler_1.ProcessingError('Failed to process text', {
                     code: 'PROCESSING_ERROR',
                     data: { text: message.text }
                 });
@@ -1230,11 +1175,11 @@ async function setupMessageHandlers() {
             return {
                 status: 'processing',
                 taskId: result.taskId,
-                debug: _utils_initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                debug: initUtils_1.initManager.debugInfo()
             };
         }
         catch (error) {
-            const { error: errorMessage, code, debug } = _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.getErrorResponse(error);
+            const { error: errorMessage, code, debug } = errorHandler_1.errorHandler.getErrorResponse(error);
             return {
                 status: 'error',
                 error: errorMessage,
@@ -1244,9 +1189,9 @@ async function setupMessageHandlers() {
         }
     });
     // Handle debug info request
-    _utils_messaging__WEBPACK_IMPORTED_MODULE_2__.messagingManager.registerHandler('getDebugInfo', async () => {
+    messaging_1.messagingManager.registerHandler('getDebugInfo', async () => {
         try {
-            await _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.checkRuntimeHealth();
+            await errorHandler_1.errorHandler.checkRuntimeHealth();
             const manifest = chrome.runtime.getManifest();
             return {
                 extensionId: chrome.runtime.id,
@@ -1254,11 +1199,11 @@ async function setupMessageHandlers() {
                 permissions: manifest.permissions || [],
                 hostPermissions: manifest.host_permissions || [],
                 timestamp: Date.now(),
-                debug: _utils_initUtils__WEBPACK_IMPORTED_MODULE_1__.initManager.debugInfo()
+                debug: initUtils_1.initManager.debugInfo()
             };
         }
         catch (error) {
-            const { error: errorMessage, code, debug } = _utils_errorHandler__WEBPACK_IMPORTED_MODULE_6__.errorHandler.getErrorResponse(error);
+            const { error: errorMessage, code, debug } = errorHandler_1.errorHandler.getErrorResponse(error);
             return {
                 extensionId: 'unavailable',
                 manifestVersion: 3,

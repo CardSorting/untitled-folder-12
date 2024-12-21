@@ -6,14 +6,13 @@
 /*!***********************!*\
   !*** ./src/config.ts ***!
   \***********************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   config: () => (/* binding */ config)
-/* harmony export */ });
+
 // Configuration for the Chrome extension
-const config = {
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.config = void 0;
+exports.config = {
     API_ENDPOINT: 'http://localhost:5001', // Default local development server
     celery: {
         timeout: 30000, // 30 seconds
@@ -33,21 +32,17 @@ const config = {
 /*!***********************************!*\
   !*** ./src/utils/celeryClient.ts ***!
   \***********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   CeleryClient: () => (/* binding */ CeleryClient),
-/* harmony export */   celeryClient: () => (/* binding */ celeryClient)
-/* harmony export */ });
-/* harmony import */ var _logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../config */ "./src/config.ts");
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.celeryClient = exports.CeleryClient = void 0;
 // Celery client for handling text processing tasks
-
-
-const logger = (0,_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('CeleryClient');
+const logger_1 = __webpack_require__(/*! ./logger */ "./src/utils/logger.ts");
+const config_1 = __webpack_require__(/*! ../config */ "./src/config.ts");
+const logger = (0, logger_1.createLogger)('CeleryClient');
 class CeleryClient {
-    constructor(baseUrl = _config__WEBPACK_IMPORTED_MODULE_1__.config.API_ENDPOINT, pollInterval = 1000, maxRetries = 3) {
+    constructor(baseUrl = config_1.config.API_ENDPOINT, pollInterval = 1000, maxRetries = 3) {
         this.baseUrl = baseUrl;
         this.taskQueue = new Map();
         this.pollInterval = pollInterval;
@@ -55,7 +50,7 @@ class CeleryClient {
     }
     async processText(text, options = {}) {
         try {
-            const response = await fetch(`${this.baseUrl}${_config__WEBPACK_IMPORTED_MODULE_1__.config.endpoints.processText}`, {
+            const response = await fetch(`${this.baseUrl}${config_1.config.endpoints.processText}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -98,7 +93,7 @@ class CeleryClient {
     }
     async getTaskResult(taskId) {
         try {
-            const response = await fetch(`${this.baseUrl}${_config__WEBPACK_IMPORTED_MODULE_1__.config.endpoints.taskStatus}/${taskId}`);
+            const response = await fetch(`${this.baseUrl}${config_1.config.endpoints.taskStatus}/${taskId}`);
             if (!response.ok) {
                 throw new Error(`Failed to get task status: ${response.statusText}`);
             }
@@ -191,7 +186,7 @@ class CeleryClient {
     }
     async cancelTask(taskId) {
         try {
-            const response = await fetch(`${this.baseUrl}${_config__WEBPACK_IMPORTED_MODULE_1__.config.endpoints.taskStatus}/${taskId}/cancel`, {
+            const response = await fetch(`${this.baseUrl}${config_1.config.endpoints.taskStatus}/${taskId}/cancel`, {
                 method: 'POST'
             });
             if (!response.ok) {
@@ -207,8 +202,9 @@ class CeleryClient {
         }
     }
 }
+exports.CeleryClient = CeleryClient;
 // Export singleton instance
-const celeryClient = new CeleryClient();
+exports.celeryClient = new CeleryClient();
 
 
 /***/ }),
@@ -217,12 +213,11 @@ const celeryClient = new CeleryClient();
 /*!*****************************!*\
   !*** ./src/utils/logger.ts ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+/***/ ((__unused_webpack_module, exports) => {
 
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   createLogger: () => (/* binding */ createLogger)
-/* harmony export */ });
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createLogger = createLogger;
 class ConsoleLogger {
     constructor(namespace, minLevel = 'debug') {
         this.namespace = namespace;
@@ -317,54 +312,24 @@ function createLogger(namespace, minLevel = 'debug') {
 /******/ 	}
 /******/ 	
 /************************************************************************/
-/******/ 	/* webpack/runtime/define property getters */
-/******/ 	(() => {
-/******/ 		// define getter functions for harmony exports
-/******/ 		__webpack_require__.d = (exports, definition) => {
-/******/ 			for(var key in definition) {
-/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
-/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
-/******/ 				}
-/******/ 			}
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
-/******/ 	(() => {
-/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
-/******/ 	})();
-/******/ 	
-/******/ 	/* webpack/runtime/make namespace object */
-/******/ 	(() => {
-/******/ 		// define __esModule on exports
-/******/ 		__webpack_require__.r = (exports) => {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 			}
-/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 		};
-/******/ 	})();
-/******/ 	
-/************************************************************************/
 var __webpack_exports__ = {};
 // This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
 (() => {
+var exports = __webpack_exports__;
 /*!************************************!*\
   !*** ./src/textProcessorWorker.ts ***!
   \************************************/
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _utils_logger__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./utils/logger */ "./src/utils/logger.ts");
-/* harmony import */ var _utils_celeryClient__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils/celeryClient */ "./src/utils/celeryClient.ts");
-/* harmony import */ var _config__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./config */ "./src/config.ts");
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
 // Text processor worker for handling speech synthesis
-
-
-
-const logger = (0,_utils_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('TextProcessorWorker');
+const logger_1 = __webpack_require__(/*! ./utils/logger */ "./src/utils/logger.ts");
+const celeryClient_1 = __webpack_require__(/*! ./utils/celeryClient */ "./src/utils/celeryClient.ts");
+const config_1 = __webpack_require__(/*! ./config */ "./src/config.ts");
+const logger = (0, logger_1.createLogger)('TextProcessorWorker');
 class TextProcessorWorker {
     constructor() {
-        this.logger = (0,_utils_logger__WEBPACK_IMPORTED_MODULE_0__.createLogger)('TextProcessorWorker');
-        this.celeryClient = new _utils_celeryClient__WEBPACK_IMPORTED_MODULE_1__.CeleryClient(_config__WEBPACK_IMPORTED_MODULE_2__.config.API_ENDPOINT);
+        this.logger = (0, logger_1.createLogger)('TextProcessorWorker');
+        this.celeryClient = new celeryClient_1.CeleryClient(config_1.config.API_ENDPOINT);
         this.currentOptions = {
             rate: 1.0,
             pitch: 1.0,
