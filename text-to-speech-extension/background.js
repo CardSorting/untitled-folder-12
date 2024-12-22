@@ -11,17 +11,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         // Speak the new text
         chrome.tts.speak(request.text, {
-            rate: 1.0,  // Normal speed
-            pitch: 1.0, // Normal pitch
-            volume: 1.0, // Full volume
+            voiceName: request.voiceName,
             onEvent: function(event) {
                 if (event.type === 'end' || event.type === 'error' || event.type === 'interrupted') {
-                    sendResponse({ status: event.type });
+                    chrome.tabs.sendMessage(sender.tab.id, { action: "speechEnded" });
                 }
             }
         });
-        
-        // Return true to indicate we'll send a response asynchronously
+        sendResponse({ status: "speaking" });
+        return true;
+    } else if (request.action === "stop") {
+        chrome.tts.stop();
+        sendResponse({ status: "stopped" });
         return true;
     }
 });

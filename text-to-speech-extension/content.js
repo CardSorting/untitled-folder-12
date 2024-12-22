@@ -9,10 +9,13 @@ overlay.style.cssText = `
 
 const speakerIcon = document.createElement('div');
 speakerIcon.innerHTML = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="play-icon">
     <path d="M12 6L8 10H4V14H8L12 18V6Z"/>
     <path d="M15.54 8.46C16.4774 9.39764 17.0039 10.6692 17.0039 12C17.0039 13.3308 16.4774 14.6024 15.54 15.54"/>
     <path d="M18.54 5.46C20.4892 7.40919 21.5751 10.1478 21.5751 13C21.5751 15.8522 20.4892 18.5908 18.54 20.54"/>
+  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="stop-icon" style="display: none;">
+    <path d="M6 6h12v12H6z"/>
   </svg>
   <span class="tooltip">Click to speak</span>
 `;
@@ -57,16 +60,36 @@ style.textContent = `
     border-radius: 8px;
     position: relative;
   }
+
+  .speaking {
+    background: #FF3B30 !important;
+  }
+
+  .speaking .play-icon {
+    display: none;
+  }
+
+  .speaking .stop-icon {
+    display: inline !important;
+  }
+
+  .speaking .tooltip {
+    content: 'Click to stop';
+  }
 `;
 document.head.appendChild(style);
 
 speakerIcon.addEventListener('mouseenter', () => {
   speakerIcon.style.transform = 'scale(1.1)';
-  speakerIcon.style.background = '#0051FF';
+  if (!speakerIcon.classList.contains('speaking')) {
+    speakerIcon.style.background = '#0051FF';
+  }
 });
 speakerIcon.addEventListener('mouseleave', () => {
   speakerIcon.style.transform = 'scale(1)';
-  speakerIcon.style.background = '#007AFF';
+  if (!speakerIcon.classList.contains('speaking')) {
+    speakerIcon.style.background = '#007AFF';
+  }
 });
 
 overlay.appendChild(speakerIcon);
@@ -75,6 +98,7 @@ document.body.appendChild(overlay);
 // Track current hoveredElement and its content
 let hoveredElement = null;
 let hoveredContent = null;
+let isSpeaking = false;
 
 // Function to find the message container
 function findMessageContainer(element) {
@@ -91,36 +115,40 @@ function findMessageContainer(element) {
   };
 }
 
-// Function to speak the current message
-function speakMessage() {
-  if (!hoveredContent) return;
+// Function to handle speech state changes
+function updateSpeechState(speaking) {
+  isSpeaking = speaking;
+  if (speaking) {
+    speakerIcon.classList.add('speaking');
+    speakerIcon.querySelector('.tooltip').textContent = 'Click to stop';
+  } else {
+    speakerIcon.classList.remove('speaking');
+    speakerIcon.querySelector('.tooltip').textContent = 'Click to speak';
+  }
+}
 
-  // Create a new SpeechSynthesisUtterance
-  const utterance = new SpeechSynthesisUtterance(hoveredContent);
-  utterance.rate = 1.0;
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
-
-  // Try to use chrome.tts first
-  try {
+// Function to speak or stop the current message
+function toggleSpeech() {
+  if (isSpeaking) {
+    chrome.runtime.sendMessage({ action: "stop" }, () => {
+      updateSpeechState(false);
+    });
+  } else if (hoveredContent) {
     chrome.runtime.sendMessage({
       action: "speak",
       text: hoveredContent
+    }, () => {
+      updateSpeechState(true);
     });
-  } catch (error) {
-    // Fallback to Web Speech API if chrome.tts fails
-    window.speechSynthesis.speak(utterance);
-  }
-  
-  // Visual feedback when speaking
-  if (hoveredElement) {
-    hoveredElement.style.transition = 'background-color 0.3s';
-    hoveredElement.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
-    setTimeout(() => {
-      hoveredElement.style.backgroundColor = 'rgba(0, 122, 255, 0.1)';
-    }, 200);
   }
 }
+
+// Listen for speech ended message from background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "speechEnded") {
+    updateSpeechState(false);
+  }
+});
 
 // Function to add hover effect to message containers
 function addHoverEffect() {
@@ -159,7 +187,7 @@ function addHoverEffect() {
 }
 
 // Handle click on speaker icon
-speakerIcon.addEventListener('click', speakMessage);
+speakerIcon.addEventListener('click', toggleSpeech);
 
 // Initial call to add hover effect
 addHoverEffect();
