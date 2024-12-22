@@ -1,5 +1,6 @@
 const errorDiv = document.getElementById('error');
 const voiceList = document.getElementById('voiceList');
+let selectedVoice = null;
 
 function showError(message) {
     errorDiv.textContent = message;
@@ -16,7 +17,7 @@ function displayVoices() {
 
     try {
         // Get Chrome TTS voices
-        chrome.tts.getVoices((voices) => {
+        chrome.tts.getVoices(async (voices) => {
             if (chrome.runtime.lastError) {
                 showError('Error loading voices: ' + chrome.runtime.lastError.message);
                 return;
@@ -27,6 +28,10 @@ function displayVoices() {
                 return;
             }
 
+            // Get saved voice preference
+            const savedVoice = await getSavedVoice();
+            selectedVoice = savedVoice;
+
             // Group voices by language
             const voicesByLang = groupVoicesByLanguage(voices);
             displayGroupedVoices(voicesByLang);
@@ -34,6 +39,24 @@ function displayVoices() {
     } catch (error) {
         showError('Failed to load voices: ' + error.message);
     }
+}
+
+async function getSavedVoice() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(['selectedVoice'], (result) => {
+            resolve(result.selectedVoice || null);
+        });
+    });
+}
+
+function saveVoicePreference(voice) {
+    chrome.storage.sync.set({
+        selectedVoice: {
+            voiceName: voice.voiceName || voice.name,
+            lang: voice.lang,
+            remote: voice.remote
+        }
+    });
 }
 
 function groupVoicesByLanguage(voices) {
@@ -114,6 +137,9 @@ function displayGroupedVoices(voicesByLang) {
 function createVoiceElement(voice) {
     const div = document.createElement('div');
     div.className = 'voice-item';
+    if (selectedVoice && (voice.voiceName === selectedVoice.voiceName || voice.name === selectedVoice.voiceName)) {
+        div.classList.add('selected');
+    }
     
     const voiceInfo = document.createElement('div');
     voiceInfo.className = 'voice-info';
@@ -126,9 +152,20 @@ function createVoiceElement(voice) {
     details.className = `voice-details${voice.remote ? ' remote' : ''}`;
     details.textContent = voice.remote ? 'Remote' : 'Local';
     
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+
+    const selectButton = document.createElement('button');
+    selectButton.className = 'select-button';
+    selectButton.textContent = selectedVoice && (voice.voiceName === selectedVoice.voiceName || voice.name === selectedVoice.voiceName) ? 'Selected' : 'Select';
+    selectButton.onclick = (e) => {
+        e.stopPropagation();
+        selectVoice(voice, selectButton, div);
+    };
+    
     const testButton = document.createElement('button');
     testButton.className = 'test-button';
-    testButton.textContent = 'Test Voice';
+    testButton.textContent = 'Test';
     testButton.onclick = (e) => {
         e.stopPropagation();
         testVoice(voice);
@@ -136,10 +173,36 @@ function createVoiceElement(voice) {
     
     voiceInfo.appendChild(name);
     voiceInfo.appendChild(details);
+    buttonContainer.appendChild(selectButton);
+    buttonContainer.appendChild(testButton);
     div.appendChild(voiceInfo);
-    div.appendChild(testButton);
+    div.appendChild(buttonContainer);
     
     return div;
+}
+
+function selectVoice(voice, button, item) {
+    // Update UI
+    document.querySelectorAll('.voice-item').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.select-button').forEach(btn => btn.textContent = 'Select');
+    item.classList.add('selected');
+    button.textContent = 'Selected';
+
+    // Save preference
+    selectedVoice = voice;
+    saveVoicePreference(voice);
+
+    // Notify content script
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        chrome.tabs.sendMessage(tabs[0].id, {
+            action: "voiceSelected",
+            voice: {
+                voiceName: voice.voiceName || voice.name,
+                lang: voice.lang,
+                remote: voice.remote
+            }
+        });
+    });
 }
 
 function testVoice(voice) {

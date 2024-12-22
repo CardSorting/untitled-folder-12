@@ -5,7 +5,8 @@
     "description": "Hover over text to read it aloud with text-to-speech",
     "permissions": [
         "activeTab",
-        "tts"
+        "tts",
+        "storage"
     ],
     "action": {
         "default_popup": "voices.html",

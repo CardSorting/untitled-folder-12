@@ -9,15 +9,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Stop any current speech
         chrome.tts.stop();
         
-        // Speak the new text
-        chrome.tts.speak(request.text, {
-            voiceName: request.voiceName,
+        // Configure speech options
+        const options = {
             onEvent: function(event) {
                 if (event.type === 'end' || event.type === 'error' || event.type === 'interrupted') {
                     chrome.tabs.sendMessage(sender.tab.id, { action: "speechEnded" });
                 }
             }
-        });
+        };
+
+        // Add voice if specified
+        if (request.voice) {
+            options.voiceName = request.voice.voiceName;
+            options.lang = request.voice.lang;
+        }
+
+        // Speak the text
+        chrome.tts.speak(request.text, options);
         sendResponse({ status: "speaking" });
         return true;
     } else if (request.action === "stop") {
