@@ -6,7 +6,8 @@
     "permissions": [
         "activeTab",
         "tts",
-        "storage"
+        "storage",
+        "tabs"
     ],
     "action": {
         "default_popup": "voices.html",

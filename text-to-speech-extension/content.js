@@ -1,3 +1,15 @@
+// State management
+const state = {
+    port: null,
+    selectedVoice: null,
+    hoveredElement: null,
+    hoveredContent: null,
+    isConnected: false,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 3,
+    reconnectTimeout: null
+};
+
 // Create overlay container for the speaker icon
 const overlay = document.createElement('div');
 overlay.style.cssText = `
@@ -60,116 +72,200 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-speakerIcon.addEventListener('mouseenter', () => {
-  speakerIcon.style.transform = 'scale(1.1)';
-  speakerIcon.style.background = '#0051FF';
-});
-speakerIcon.addEventListener('mouseleave', () => {
-  speakerIcon.style.transform = 'scale(1)';
-  speakerIcon.style.background = '#007AFF';
-});
+// Connection management
+async function connectToBackground() {
+    if (state.reconnectAttempts >= state.maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached');
+        return false;
+    }
 
-overlay.appendChild(speakerIcon);
-document.body.appendChild(overlay);
+    try {
+        // Check connection first
+        const isConnected = await checkConnection();
+        if (!isConnected) {
+            throw new Error('Connection check failed');
+        }
 
-// Track current hoveredElement and its content
-let hoveredElement = null;
-let hoveredContent = null;
-let selectedVoice = null;
+        // Create port connection
+        state.port = chrome.runtime.connect({ name: 'content-script-' + Date.now() });
+        
+        state.port.onMessage.addListener((msg) => {
+            if (msg.action === 'voiceStateUpdate' && msg.voice) {
+                state.selectedVoice = msg.voice;
+            }
+        });
+        
+        state.port.onDisconnect.addListener(() => {
+            state.isConnected = false;
+            state.port = null;
+            
+            if (chrome.runtime.lastError) {
+                console.warn('Port disconnected:', chrome.runtime.lastError);
+                scheduleReconnect();
+            }
+        });
 
-// Function to find the message container
-function findMessageContainer(element) {
-  // Look for the font-claude-message class which wraps each message
-  const messageContainer = element.closest('.font-claude-message');
-  if (!messageContainer) return null;
-
-  // Get the text content directly from the message container
-  const content = messageContainer.textContent.trim();
-
-  return {
-    container: messageContainer,
-    content: content
-  };
+        // Get initial voice state
+        state.port.postMessage({ action: 'getVoiceState' });
+        
+        state.isConnected = true;
+        state.reconnectAttempts = 0;
+        return true;
+    } catch (error) {
+        console.warn('Connection attempt failed:', error);
+        scheduleReconnect();
+        return false;
+    }
 }
 
-// Function to speak the current message
-function speakMessage() {
-  if (!hoveredContent) return;
-
-  // Send message to background script for speech synthesis
-  try {
-    chrome.runtime.sendMessage({
-      action: "speak",
-      text: hoveredContent,
-      voice: selectedVoice
-    });
+function scheduleReconnect() {
+    if (state.reconnectTimeout) {
+        clearTimeout(state.reconnectTimeout);
+    }
     
-    // Visual feedback when speaking
-    if (hoveredElement) {
-      hoveredElement.style.transition = 'background-color 0.3s';
-      hoveredElement.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
-      setTimeout(() => {
-        hoveredElement.style.backgroundColor = 'rgba(0, 122, 255, 0.1)';
-      }, 200);
+    state.reconnectAttempts++;
+    if (state.reconnectAttempts < state.maxReconnectAttempts) {
+        const delay = Math.min(1000 * Math.pow(2, state.reconnectAttempts - 1), 5000);
+        state.reconnectTimeout = setTimeout(() => connectToBackground(), delay);
     }
-  } catch (error) {
-    console.error('Failed to send message:', error);
-  }
 }
 
-// Function to add hover effect to message containers
+async function checkConnection() {
+    try {
+        const response = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({ action: 'ping' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    resolve(false);
+                } else {
+                    resolve(response && response.status === 'connected');
+                }
+            });
+        });
+        return response;
+    } catch {
+        return false;
+    }
+}
+
+// Message handling
+function findMessageContainer(element) {
+    const messageContainer = element.closest('.font-claude-message');
+    if (!messageContainer) return null;
+
+    const content = messageContainer.textContent.trim();
+    return { container: messageContainer, content };
+}
+
+async function speakMessage() {
+    if (!state.hoveredContent) return;
+
+    try {
+        if (!state.isConnected) {
+            const connected = await connectToBackground();
+            if (!connected) {
+                console.error('Failed to establish connection');
+                return;
+            }
+        }
+
+        chrome.runtime.sendMessage({
+            action: "speak",
+            text: state.hoveredContent,
+            voice: state.selectedVoice
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.warn('Speech error:', chrome.runtime.lastError);
+                if (chrome.runtime.lastError.message.includes('Extension context invalidated')) {
+                    window.location.reload();
+                }
+                return;
+            }
+            
+            if (response && response.status === "speaking" && state.hoveredElement) {
+                state.hoveredElement.style.transition = 'background-color 0.3s';
+                state.hoveredElement.style.backgroundColor = 'rgba(0, 122, 255, 0.2)';
+                setTimeout(() => {
+                    if (state.hoveredElement) {
+                        state.hoveredElement.style.backgroundColor = 'rgba(0, 122, 255, 0.1)';
+                    }
+                }, 200);
+            }
+        });
+    } catch (error) {
+        console.error('Failed to speak message:', error);
+    }
+}
+
+// Event handlers
 function addHoverEffect() {
-  document.addEventListener('mouseover', (e) => {
-    const result = findMessageContainer(e.target);
-    if (result && result.container !== hoveredElement) {
-      // Remove highlight from any previously highlighted containers
-      document.querySelectorAll('.highlight-message').forEach(el => {
-        el.classList.remove('highlight-message');
-      });
-      
-      // Add highlight to current container
-      result.container.classList.add('highlight-message');
-      hoveredElement = result.container;
-      hoveredContent = result.content;
-      
-      // Position overlay next to the message
-      const rect = result.container.getBoundingClientRect();
-      overlay.style.display = 'block';
-      overlay.style.top = `${rect.top + 20}px`;
-      overlay.style.left = `${rect.right - 60}px`;
-    }
-  });
+    document.addEventListener('mouseover', (e) => {
+        const result = findMessageContainer(e.target);
+        if (result && result.container !== state.hoveredElement) {
+            document.querySelectorAll('.highlight-message').forEach(el => {
+                el.classList.remove('highlight-message');
+            });
+            
+            result.container.classList.add('highlight-message');
+            state.hoveredElement = result.container;
+            state.hoveredContent = result.content;
+            
+            const rect = result.container.getBoundingClientRect();
+            overlay.style.display = 'block';
+            overlay.style.top = `${rect.top + 20}px`;
+            overlay.style.left = `${rect.right - 60}px`;
+        }
+    });
 
-  document.addEventListener('mouseout', (e) => {
-    const result = findMessageContainer(e.target);
-    if (result && !e.relatedTarget?.closest('.speech-icon')) {
-      result.container.classList.remove('highlight-message');
-      if (hoveredElement === result.container) {
-        hoveredElement = null;
-        hoveredContent = null;
-        overlay.style.display = 'none';
-      }
-    }
-  });
+    document.addEventListener('mouseout', (e) => {
+        const result = findMessageContainer(e.target);
+        if (result && !e.relatedTarget?.closest('.speech-icon')) {
+            result.container.classList.remove('highlight-message');
+            if (state.hoveredElement === result.container) {
+                state.hoveredElement = null;
+                state.hoveredContent = null;
+                overlay.style.display = 'none';
+            }
+        }
+    });
 }
 
-// Listen for voice selection from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "voiceSelected") {
-    selectedVoice = request.voice;
-    chrome.storage.sync.set({ selectedVoice: request.voice });
-  }
+// Icon event listeners
+speakerIcon.addEventListener('mouseenter', () => {
+    speakerIcon.style.transform = 'scale(1.1)';
+    speakerIcon.style.background = '#0051FF';
 });
 
-// Load saved voice preference
-chrome.storage.sync.get(['selectedVoice'], (result) => {
-  if (result.selectedVoice) {
-    selectedVoice = result.selectedVoice;
-  }
+speakerIcon.addEventListener('mouseleave', () => {
+    speakerIcon.style.transform = 'scale(1)';
+    speakerIcon.style.background = '#007AFF';
 });
 
-// Handle click on speaker icon
 speakerIcon.addEventListener('click', speakMessage);
 
-// Initial call to add hover effect
+// Message listeners
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "voiceSelected") {
+        state.selectedVoice = request.voice;
+        sendResponse({ status: "voice updated" });
+    } else if (request.action === "speechEnded") {
+        if (request.error) {
+            console.error('Speech error:', request.error);
+        }
+    }
+});
+
+// Initialize
+overlay.appendChild(speakerIcon);
+document.body.appendChild(overlay);
 addHoverEffect();
+connectToBackground();
+
+// Cleanup
+window.addEventListener('unload', () => {
+    if (state.reconnectTimeout) {
+        clearTimeout(state.reconnectTimeout);
+    }
+    if (state.port) {
+        state.port.disconnect();
+    }
+});
