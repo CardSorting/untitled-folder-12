@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Text-to-Speech Voices</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f7;
+        }
+        
+        .header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #007AFF;
+        }
+        
+        .voice-list {
+            display: grid;
+            gap: 10px;
+        }
+        
+        .voice-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .voice-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .voice-name {
+            font-weight: bold;
+            color: #007AFF;
+        }
+        
+        .voice-details {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .test-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+        
+        .test-button:hover {
+            background: #0051FF;
+        }
+        
+        .no-voices {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Available Text-to-Speech Voices</h1>
+    </div>
+    
+    <div id="voiceList" class="voice-list">
+        <div class="no-voices">Loading voices...</div>
+    </div>
+
+    <script>
+        function displayVoices() {
+            const voiceList = document.getElementById('voiceList');
+            voiceList.innerHTML = ''; // Clear loading message
+            
+            // Try to get Chrome TTS voices first
+            chrome.tts.getVoices((voices) => {
+                if (voices && voices.length > 0) {
+                    voices.forEach(voice => {
+                        const voiceItem = createVoiceElement(voice, true);
+                        voiceList.appendChild(voiceItem);
+                    });
+                } else {
+                    // Fallback to Web Speech API voices
+                    const webVoices = window.speechSynthesis.getVoices();
+                    if (webVoices.length > 0) {
+                        webVoices.forEach(voice => {
+                            const voiceItem = createVoiceElement(voice, false);
+                            voiceList.appendChild(voiceItem);
+                        });
+                    } else {
+                        voiceList.innerHTML = '<div class="no-voices">No voices available</div>';
+                    }
+                }
+            });
+        }
+
+        function createVoiceElement(voice, isChromeTTS) {
+            const div = document.createElement('div');
+            div.className = 'voice-item';
+            
+            const testButton = document.createElement('button');
+            testButton.className = 'test-button';
+            testButton.textContent = 'Test Voice';
+            testButton.onclick = () => testVoice(voice, isChromeTTS);
+            
+            const name = document.createElement('div');
+            name.className = 'voice-name';
+            name.textContent = voice.name;
+            
+            const details = document.createElement('div');
+            details.className = 'voice-details';
+            details.textContent = `Lang: ${voice.lang || 'N/A'} | Source: ${isChromeTTS ? 'Chrome TTS' : 'Web Speech API'}`;
+            
+            div.appendChild(testButton);
+            div.appendChild(name);
+            div.appendChild(details);
+            
+            return div;
+        }
+
+        function testVoice(voice, isChromeTTS) {
+            const testText = "This is a test of the text-to-speech voice.";
+            
+            if (isChromeTTS) {
+                chrome.tts.speak(testText, {
+                    voiceName: voice.voiceName
+                });
+            } else {
+                const utterance = new SpeechSynthesisUtterance(testText);
+                utterance.voice = voice;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Initial load of voices
+        displayVoices();
+
+        // Handle dynamic voice loading for Web Speech API
+        if ('onvoiceschanged' in window.speechSynthesis) {
+            window.speechSynthesis.onvoiceschanged = displayVoices;
+        }
+    </script>
+</body>
+</html>
