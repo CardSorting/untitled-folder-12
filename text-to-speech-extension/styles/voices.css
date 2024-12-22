@@ -1,0 +1,248 @@
+/* Base styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    max-width: 800px;
+    margin: 0;
+    padding: 20px;
+    background: #f5f5f7;
+    min-width: 400px;
+    color: #333;
+}
+
+/* Header styles */
+.header {
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #007AFF;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #1a1a1a;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+/* Language section styles */
+.language-section {
+    margin-bottom: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.language-section:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.language-header {
+    padding: 18px 20px;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.language-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+}
+
+.language-name::after {
+    content: attr(data-count);
+    margin-left: 8px;
+    font-size: 13px;
+    color: #666;
+    font-weight: normal;
+}
+
+.collapse-button {
+    background: none;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+    color: #007AFF;
+    transition: transform 0.2s ease;
+    opacity: 0.8;
+}
+
+.collapse-button:hover {
+    opacity: 1;
+}
+
+.collapse-button.collapsed {
+    transform: rotate(-90deg);
+}
+
+.voices-container {
+    transition: max-height 0.3s ease;
+    padding: 4px 0;
+}
+
+.language-section.collapsed .voices-container {
+    display: none;
+}
+
+/* Voice item styles */
+.voice-item {
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+}
+
+.voice-item:last-child {
+    border-bottom: none;
+}
+
+.voice-item:hover {
+    background: #f8f9fa;
+}
+
+.voice-info {
+    flex: 1;
+    margin-right: 16px;
+}
+
+.voice-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: #2c2c2c;
+    margin-bottom: 4px;
+    letter-spacing: -0.2px;
+}
+
+.voice-details {
+    color: #666;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+}
+
+.voice-details::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    background: #34c759;
+}
+
+.voice-details.remote::before {
+    background: #007AFF;
+}
+
+/* Button styles */
+.test-button {
+    background: #007AFF;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    letter-spacing: -0.2px;
+}
+
+.test-button:hover {
+    background: #0051FF;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+}
+
+.test-button:active {
+    transform: scale(0.95);
+}
+
+/* Status messages */
+.no-voices {
+    text-align: center;
+    padding: 32px 24px;
+    color: #666;
+    background: white;
+    border-radius: 12px;
+    margin-top: 20px;
+    font-size: 15px;
+}
+
+.error {
+    background: #FFE5E5;
+    color: #FF3B30;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: none;
+    font-size: 14px;
+    border: 1px solid rgba(255,59,48,0.2);
+    font-weight: 500;
+}
+
+/* Loading state */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    color: #666;
+    font-size: 15px;
+}
+
+.loading::after {
+    content: '';
+    width: 20px;
+    height: 20px;
+    margin-left: 10px;
+    border: 2px solid #007AFF;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Scrollbar styles */
+.voice-list {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin: 0 -8px 0 0;
+}
+
+.voice-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.voice-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 6px;
+}
+
+.voice-list::-webkit-scrollbar-thumb {
+    background: #007AFF;
+    border-radius: 6px;
+    opacity: 0.8;
+}
+
+.voice-list::-webkit-scrollbar-thumb:hover {
+    opacity: 1;
+}
