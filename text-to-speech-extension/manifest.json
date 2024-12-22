@@ -10,7 +10,6 @@
         "tabs"
     ],
     "action": {
-        "default_popup": "voices.html",
         "default_icon": {
             "48": "icons/icon48.png",
             "128": "icons/icon128.png"

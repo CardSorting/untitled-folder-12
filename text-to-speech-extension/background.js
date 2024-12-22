@@ -1,42 +1,204 @@
 // Background service worker for extension-wide functionality
-let activeConnections = new Map();
-let currentVoiceState = null;
+const voiceCache = {
+    currentVoice: null,
+    availableVoices: [],
+    connections: new Map(),
+    initialized: false,
+    pendingOperations: new Map(),
+    operationTimeout: 10000, // 10 seconds timeout for operations
+    lastUpdate: null
+};
+
+// Voice state lifecycle management
+class VoiceStateManager {
+    constructor() {
+        this.stateQueue = [];
+        this.isProcessing = false;
+        this.retryCount = 0;
+        this.maxRetries = 3;
+    }
+
+    async queueStateUpdate(operation) {
+        return new Promise((resolve, reject) => {
+            const operationId = Date.now().toString();
+            
+            // Add to pending operations
+            voiceCache.pendingOperations.set(operationId, {
+                resolve,
+                reject,
+                timestamp: Date.now(),
+                operation
+            });
+
+            // Add to queue
+            this.stateQueue.push(operationId);
+            
+            // Start processing if not already running
+            if (!this.isProcessing) {
+                this.processQueue();
+            }
+
+            // Set timeout for operation
+            setTimeout(() => {
+                if (voiceCache.pendingOperations.has(operationId)) {
+                    const operation = voiceCache.pendingOperations.get(operationId);
+                    voiceCache.pendingOperations.delete(operationId);
+                    operation.reject(new Error('Operation timed out'));
+                }
+            }, voiceCache.operationTimeout);
+        });
+    }
+
+    async processQueue() {
+        if (this.isProcessing || this.stateQueue.length === 0) return;
+
+        this.isProcessing = true;
+        
+        while (this.stateQueue.length > 0) {
+            const operationId = this.stateQueue[0];
+            const operation = voiceCache.pendingOperations.get(operationId);
+            
+            if (!operation) {
+                this.stateQueue.shift();
+                continue;
+            }
+
+            try {
+                const result = await this.executeOperation(operation.operation);
+                operation.resolve(result);
+            } catch (error) {
+                if (this.retryCount < this.maxRetries) {
+                    this.retryCount++;
+                    console.warn(`Retrying operation (${this.retryCount}/${this.maxRetries}):`, error);
+                    continue;
+                }
+                operation.reject(error);
+            }
+
+            voiceCache.pendingOperations.delete(operationId);
+            this.stateQueue.shift();
+            this.retryCount = 0;
+        }
+
+        this.isProcessing = false;
+    }
+
+    async executeOperation(operation) {
+        switch (operation.type) {
+            case 'updateVoice':
+                return this.updateVoiceState(operation.voice);
+            case 'initializeVoices':
+                return this.initializeVoiceState();
+            default:
+                throw new Error(`Unknown operation type: ${operation.type}`);
+        }
+    }
+
+    async updateVoiceState(voice) {
+        if (!isValidVoice(voice)) {
+            throw new Error('Invalid voice data');
+        }
+
+        // Verify voice is available
+        if (!voiceCache.availableVoices.some(v => v.voiceName === voice.voiceName)) {
+            throw new Error('Selected voice not available');
+        }
+
+        // Update cache
+        voiceCache.currentVoice = voice;
+        voiceCache.lastUpdate = Date.now();
+
+        // Save to storage
+        await new Promise((resolve, reject) => {
+            chrome.storage.sync.set({ 
+                selectedVoice: voice,
+                lastUpdate: voiceCache.lastUpdate
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    resolve();
+                }
+            });
+        });
+
+        // Broadcast update
+        broadcastVoiceUpdate();
+        return true;
+    }
+
+    async initializeVoiceState() {
+        if (voiceCache.initialized) return true;
+
+        // Load saved state
+        const state = await new Promise((resolve) => {
+            chrome.storage.sync.get(['selectedVoice', 'lastUpdate'], (result) => {
+                resolve(result);
+            });
+        });
+
+        // Get available voices
+        const voices = await new Promise((resolve) => {
+            chrome.tts.getVoices((voices) => {
+                resolve(voices || []);
+            });
+        });
+        
+        voiceCache.availableVoices = voices;
+
+        // Set current voice
+        if (state.selectedVoice && isValidVoice(state.selectedVoice) && 
+            voices.some(v => v.voiceName === state.selectedVoice.voiceName)) {
+            voiceCache.currentVoice = state.selectedVoice;
+            voiceCache.lastUpdate = state.lastUpdate || Date.now();
+        } else {
+            // Set default voice (prefer English)
+            const defaultVoice = voices.find(v => v.lang && v.lang.startsWith('en') && !v.remote) || voices[0];
+            if (defaultVoice) {
+                voiceCache.currentVoice = {
+                    voiceName: defaultVoice.voiceName || defaultVoice.name,
+                    lang: defaultVoice.lang,
+                    remote: defaultVoice.remote
+                };
+                voiceCache.lastUpdate = Date.now();
+            }
+        }
+
+        voiceCache.initialized = true;
+        broadcastVoiceUpdate();
+        return true;
+    }
+}
+
+const voiceStateManager = new VoiceStateManager();
 
 // Voice validation
 function isValidVoice(voice) {
     return voice && voice.voiceName && voice.lang;
 }
 
-// Initialize voice state
-async function initializeVoiceState() {
-    try {
-        const result = await new Promise((resolve) => {
-            chrome.storage.sync.get(['selectedVoice'], (result) => {
-                resolve(result);
-            });
-        });
-        
-        if (result.selectedVoice && isValidVoice(result.selectedVoice)) {
-            currentVoiceState = result.selectedVoice;
-        } else {
-            // Get default voice
-            chrome.tts.getVoices((voices) => {
-                if (voices && voices.length > 0) {
-                    // Prefer English voices
-                    const englishVoice = voices.find(v => v.lang && v.lang.startsWith('en') && !v.remote);
-                    currentVoiceState = englishVoice || voices[0];
-                }
-            });
+// Broadcast voice update to all connections
+function broadcastVoiceUpdate() {
+    const message = { 
+        action: 'voiceStateUpdate', 
+        voice: voiceCache.currentVoice,
+        timestamp: voiceCache.lastUpdate
+    };
+
+    // Notify all ports
+    voiceCache.connections.forEach(port => {
+        try {
+            port.postMessage(message);
+        } catch (error) {
+            console.warn('Failed to notify port:', error);
         }
-    } catch (error) {
-        console.error('Failed to initialize voice state:', error);
-    }
+    });
 }
 
 // Handle installation
 chrome.runtime.onInstalled.addListener(() => {
     console.log('Text-to-Speech Reader extension installed');
-    initializeVoiceState();
+    voiceStateManager.queueStateUpdate({ type: 'initializeVoices' });
 });
 
 // Handle port connections
@@ -44,52 +206,60 @@ chrome.runtime.onConnect.addListener((port) => {
     console.log('Port connected:', port.name);
     
     // Store connection
-    activeConnections.set(port.name, port);
+    voiceCache.connections.set(port.name, port);
+    
+    // Send current voice state
+    if (voiceCache.currentVoice) {
+        port.postMessage({ 
+            action: 'voiceStateUpdate', 
+            voice: voiceCache.currentVoice,
+            timestamp: voiceCache.lastUpdate
+        });
+    }
     
     port.onMessage.addListener((msg) => {
         if (msg.action === 'getVoiceState') {
             port.postMessage({ 
                 action: 'voiceStateUpdate', 
-                voice: currentVoiceState 
+                voice: voiceCache.currentVoice,
+                timestamp: voiceCache.lastUpdate
             });
         }
     });
     
     port.onDisconnect.addListener(() => {
         console.log('Port disconnected:', port.name);
-        activeConnections.delete(port.name);
-        
-        if (chrome.runtime.lastError) {
-            console.warn('Port error:', chrome.runtime.lastError);
-        }
+        voiceCache.connections.delete(port.name);
     });
 });
 
-// Handle messages from content scripts
+// Handle messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    // Handle ping messages for connection checking
+    // Handle ping messages
     if (request.action === 'ping') {
-        sendResponse({ status: 'connected' });
+        sendResponse({ 
+            status: 'connected',
+            timestamp: Date.now()
+        });
         return true;
     }
     
     // Handle voice selection
     if (request.action === 'voiceSelected' && request.voice) {
-        if (isValidVoice(request.voice)) {
-            currentVoiceState = request.voice;
-            // Notify all active connections
-            activeConnections.forEach(port => {
-                try {
-                    port.postMessage({ 
-                        action: 'voiceStateUpdate', 
-                        voice: currentVoiceState 
-                    });
-                } catch (error) {
-                    console.warn('Failed to notify port:', port.name, error);
-                }
+        voiceStateManager.queueStateUpdate({
+            type: 'updateVoice',
+            voice: request.voice
+        }).then(success => {
+            sendResponse({ 
+                status: success ? 'updated' : 'failed',
+                timestamp: voiceCache.lastUpdate
             });
-        }
-        sendResponse({ status: 'voice updated' });
+        }).catch(error => {
+            sendResponse({ 
+                status: 'failed',
+                error: error.message
+            });
+        });
         return true;
     }
     
@@ -105,7 +275,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     try {
                         chrome.tabs.sendMessage(sender.tab.id, { 
                             action: "speechEnded",
-                            error: event.type === 'error' ? event.errorMessage : null
+                            error: event.type === 'error' ? event.errorMessage : null,
+                            timestamp: Date.now()
                         });
                     } catch (error) {
                         console.warn('Failed to send speech end event:', error);
@@ -114,22 +285,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         };
 
-        // Add voice if specified, fallback to current state
-        if (request.voice && isValidVoice(request.voice)) {
-            options.voiceName = request.voice.voiceName;
-            options.lang = request.voice.lang;
-        } else if (currentVoiceState) {
-            options.voiceName = currentVoiceState.voiceName;
-            options.lang = currentVoiceState.lang;
+        // Use specified voice or fall back to cached voice
+        const voice = request.voice || voiceCache.currentVoice;
+        if (voice) {
+            options.voiceName = voice.voiceName;
+            options.lang = voice.lang;
         }
 
         // Speak the text
         try {
             chrome.tts.speak(request.text, options);
-            sendResponse({ status: "speaking" });
+            sendResponse({ 
+                status: "speaking",
+                timestamp: Date.now()
+            });
         } catch (error) {
             console.error('Speech error:', error);
-            sendResponse({ status: "error", message: error.message });
+            sendResponse({ 
+                status: "error", 
+                message: error.message,
+                timestamp: Date.now()
+            });
         }
         return true;
     }
@@ -137,14 +313,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Handle stop requests
     if (request.action === "stop") {
         chrome.tts.stop();
-        sendResponse({ status: "stopped" });
+        sendResponse({ 
+            status: "stopped",
+            timestamp: Date.now()
+        });
         return true;
     }
 });
 
 // Handle extension suspension
 chrome.runtime.onSuspend.addListener(() => {
-    // Clean up
     chrome.tts.stop();
-    activeConnections.clear();
+    voiceCache.connections.clear();
 });
